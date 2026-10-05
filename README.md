@@ -19,6 +19,12 @@ curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/ins
 최신 릴리스를 내려받아 SHA-256 을 확인하고 `/Applications` (쓸 수 없으면 `~/Applications`) 에 설치한 뒤 실행합니다.
 sudo 는 쓰지 않습니다. 같은 명령으로 업데이트합니다.
 
+브라우저로 받기 (DMG):
+
+1. [최신 릴리스](https://github.com/jdragon96/TokenViewer/releases/latest)에서 `TokenViewer-macos.dmg` 를 받아 엽니다.
+2. TokenViewer 를 옆의 Applications 폴더로 끌어다 놓습니다.
+3. 응용 프로그램 폴더에서 TokenViewer 를 엽니다. 처음 한 번은 macOS 가 막습니다 (아래 "처음 실행할 때").
+
 소스에서 설치 (Xcode 16 이상 필요):
 
 ```bash
@@ -37,7 +43,9 @@ curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/ins
 
 - macOS 가 Keychain 의 `Claude Code-credentials` 접근을 묻습니다. "항상 허용"을 누르세요.
 - 릴리스 앱은 Apple Developer ID 가 아닌 ad-hoc 서명입니다. 그래서 **업데이트할 때마다 Keychain 허용 창이 한 번 더 뜹니다.**
-  curl 로 설치하면 Gatekeeper 경고 없이 실행됩니다. 브라우저로 zip 을 받으면 시스템 설정 → 개인정보 보호 및 보안 → "그래도 열기"가 필요합니다.
+- curl 로 설치하면 Gatekeeper 경고 없이 실행됩니다. DMG 로 설치하면 처음 열 때 "Apple 이 악성 코드가 없음을 확인할 수 없습니다"가 뜹니다.
+  시스템 설정 → 개인정보 보호 및 보안 → 아래쪽의 **"그래도 열기"** 를 누르고 한 번 더 열면, 그 뒤로는 묻지 않습니다.
+  터미널에 익숙하다면 `xattr -dr com.apple.quarantine /Applications/TokenViewer.app` 로도 됩니다.
 - 로그인 시 자동 실행이 기본으로 켜져 있습니다. 설정(⚙)이나 시스템 설정 → 일반 → 로그인 항목에서 끌 수 있습니다.
 
 ### 앱이 읽는 것과 보내는 곳
@@ -55,11 +63,11 @@ curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/ins
 cd macos
 swift test                       # 단위 테스트
 scripts/build-app.sh --debug     # dist/TokenViewer.app (빠른 디버그 빌드)
-scripts/build-app.sh             # universal 릴리스 빌드 + zip + sha256
+scripts/build-app.sh             # universal 릴리스 빌드 + zip + dmg + sha256
 ```
 
 `TV_SIGN_IDENTITY="Developer ID Application: …"` 와 `TV_NOTARY_PROFILE=<notarytool 프로필>` 을 주면 서명·공증까지 합니다.
-`v*` 태그를 올리면 GitHub Actions 가 릴리스에 zip, sha256, install.sh 를 올립니다.
+`v*` 태그를 올리면 GitHub Actions 가 릴리스에 zip, dmg, sha256, install.sh 를 올립니다.
 
 설계: `docs/superpowers/specs/2026-10-05-macos-swift-app-design.md`
 

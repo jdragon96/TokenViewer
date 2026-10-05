@@ -157,6 +157,7 @@ LICENSE                       MIT
 4. 서명: `codesign --force --options runtime --sign "${TV_SIGN_IDENTITY:--}"`. 값이 없으면 ad-hoc.
 5. `TV_NOTARY_PROFILE` 이 있으면 `xcrun notarytool submit --keychain-profile … --wait` → `xcrun stapler staple`.
 6. 결과: `macos/dist/TokenViewer.app`, `macos/dist/TokenViewer-macos.zip` (`ditto -c -k --keepParent`), `TokenViewer-macos.zip.sha256`. `.app` 크기를 출력하고 3MB 를 넘으면 경고한다.
+7. 릴리스 빌드는 브라우저 설치용 `TokenViewer-macos.dmg` (앱 + `/Applications` 바로가기, `hdiutil` UDZO) 와 `.sha256` 도 만든다. 서명 ID 가 있으면 DMG 도 서명하고, 공증 프로필이 있으면 DMG 도 공증·staple 한다 (2026-10-05 추가).
 
 ### 5.2. `macos/scripts/install.sh`
 
@@ -175,7 +176,7 @@ LICENSE                       MIT
 ### 5.3. CI (`.github/workflows/macos.yml`)
 
 - `macos/**`, `shared/**`, 워크플로 파일이 바뀐 push·PR: `swift test`.
-- `v*` 태그: `swift test` → `build-app.sh` → GitHub Release 에 `TokenViewer-macos.zip`, `.sha256`, `install.sh` 를 올린다.
+- `v*` 태그: `swift test` → `build-app.sh` → GitHub Release 에 `TokenViewer-macos.zip`, `TokenViewer-macos.dmg`, 각 `.sha256`, `install.sh` 를 올린다.
 - 러너: `macos-15` (Xcode 16 이상, Swift 6). `Package.swift` 는 tools-version 6.0 이라 그 위 버전에서도 빌드된다.
 
 ## 6. 공개 준비

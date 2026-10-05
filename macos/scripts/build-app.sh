@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds TokenViewer.app into macos/dist (spec 5.1).
-#   ./build-app.sh            universal release build, signed, zipped
+#   ./build-app.sh            universal release build, signed, zipped and packed into a drag-to-install DMG
 #   ./build-app.sh --debug    host-arch debug build for quick manual checks
 # Environment: TV_VERSION, TV_REPO (owner/name), TV_SIGN_IDENTITY (default ad-hoc), TV_NOTARY_PROFILE.
 set -euo pipefail
@@ -10,6 +10,7 @@ REPO_ROOT="$(cd "$MACOS_DIR/.." && pwd)"
 DIST="$MACOS_DIR/dist"
 APP="$DIST/TokenViewer.app"
 ZIP="$DIST/TokenViewer-macos.zip"
+DMG="$DIST/TokenViewer-macos.dmg"
 SIZE_LIMIT_KB=3072
 
 BUILD_FLAGS=(-c release --arch arm64 --arch x86_64 -Xswiftc -Osize)
@@ -28,7 +29,7 @@ cd "$MACOS_DIR"
 swift build "${BUILD_FLAGS[@]}"
 BIN_DIR="$(swift build "${BUILD_FLAGS[@]}" --show-bin-path)"
 
-rm -rf "$APP" "$ZIP" "$ZIP.sha256"
+rm -rf "$APP" "$ZIP" "$ZIP.sha256" "$DMG" "$DMG.sha256"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/TokenViewer" "$APP/Contents/MacOS/TokenViewer"
 cp "$MACOS_DIR/Info.plist" "$APP/Contents/Info.plist"
@@ -70,8 +71,28 @@ fi
 ditto -c -k --keepParent "$APP" "$ZIP"
 (cd "$DIST" && shasum -a 256 "$(basename "$ZIP")" > "$(basename "$ZIP").sha256")
 
+# The DMG is for browser downloads: the app next to an Applications shortcut, ready to drag over.
+if [[ $IS_RELEASE == 1 ]]; then
+    DMG_ROOT="$(mktemp -d)"
+    ditto "$APP" "$DMG_ROOT/TokenViewer.app"
+    ln -s /Applications "$DMG_ROOT/Applications"
+    hdiutil create -volname TokenViewer -srcfolder "$DMG_ROOT" -fs HFS+ -format UDZO -ov -quiet "$DMG"
+    rm -r "$DMG_ROOT"
+    if [[ "$SIGN_IDENTITY" != "-" ]]; then
+        codesign --force --sign "$SIGN_IDENTITY" --timestamp "$DMG"
+    fi
+    if [[ -n "${TV_NOTARY_PROFILE:-}" ]]; then
+        xcrun notarytool submit "$DMG" --keychain-profile "$TV_NOTARY_PROFILE" --wait
+        xcrun stapler staple "$DMG"
+    fi
+    (cd "$DIST" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
+fi
+
 SIZE_KB="$(du -sk "$APP" | awk '{print $1}')"
 echo "TokenViewer.app $VERSION: ${SIZE_KB} KB [$(lipo -archs "$APP/Contents/MacOS/TokenViewer")]"
+if [[ $IS_RELEASE == 1 ]]; then
+    echo "TokenViewer-macos.dmg: $(( $(stat -f%z "$DMG") / 1024 )) KB"
+fi
 if [[ $IS_RELEASE == 1 && $SIZE_KB -gt $SIZE_LIMIT_KB ]]; then
     echo "warning: TokenViewer.app is larger than 3 MB" >&2
 fi
