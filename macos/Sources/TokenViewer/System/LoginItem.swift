@@ -12,7 +12,11 @@ enum LoginItem {
         let service = SMAppService.mainApp
         do {
             if enabled {
-                guard isInstalled, service.status == .notRegistered || service.status == .notFound else {
+                guard isInstalled else {
+                    log.notice("launch at login skipped: \(Bundle.main.bundleURL.path, privacy: .public) is not in an Applications folder")
+                    return
+                }
+                guard service.status == .notRegistered || service.status == .notFound else {
                     return
                 }
                 try service.register()

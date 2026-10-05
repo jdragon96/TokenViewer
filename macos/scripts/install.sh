@@ -8,6 +8,7 @@ set -euo pipefail
 
 BUNDLE_ID="com.tokenviewer.TokenViewer"
 APP_NAME="TokenViewer.app"
+APP_PROCESS="$APP_NAME/Contents/MacOS/TokenViewer"
 ASSET="TokenViewer-macos.zip"
 # The release workflow rewrites this line with the GitHub repository (owner/name).
 RELEASE_REPO=""
@@ -54,13 +55,14 @@ install_dir() {
 }
 
 quit_app() {
-    pgrep -x TokenViewer >/dev/null || return 0
-    osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>&1 || true
+    pgrep -f "$APP_PROCESS" >/dev/null || return 0
+    # SIGTERM ends the app like its 종료 button; asking through AppleScript would show an Automation permission prompt.
+    pkill -TERM -f "$APP_PROCESS" || true
     for _ in $(seq 1 50); do
-        pgrep -x TokenViewer >/dev/null || return 0
+        pgrep -f "$APP_PROCESS" >/dev/null || return 0
         sleep 0.1
     done
-    pkill -x TokenViewer || true
+    pkill -KILL -f "$APP_PROCESS" || true
 }
 
 open_app() {
