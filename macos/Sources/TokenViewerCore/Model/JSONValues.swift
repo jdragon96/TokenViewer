@@ -1,17 +1,13 @@
 import Foundation
 
-/// ISO 8601 parsing for log timestamps and API reset times.
+/// ISO 8601 parsing for log timestamps and API reset times. The format styles are Sendable values,
+/// so the log scanner and the usage fetcher can parse at the same time without sharing a formatter.
 enum ISODate {
-    // ISO8601DateFormatter is thread-safe; these are configured once and only read afterwards.
-    nonisolated(unsafe) private static let fractional: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-    nonisolated(unsafe) private static let whole = ISO8601DateFormatter()
+    private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let whole = Date.ISO8601FormatStyle()
 
     static func parse(_ text: String) -> Date? {
-        if let date = fractional.date(from: text) ?? whole.date(from: text) {
+        if let date = (try? fractional.parse(text)) ?? (try? whole.parse(text)) {
             return date
         }
         // The usage API sends microseconds; cut the fraction to milliseconds and try again.
@@ -24,7 +20,7 @@ enum ISODate {
             return nil
         }
         let millisecondsEnd = text.index(digitsStart, offsetBy: 3)
-        return fractional.date(from: String(text[..<millisecondsEnd]) + String(text[digitsEnd...]))
+        return try? fractional.parse(String(text[..<millisecondsEnd]) + String(text[digitsEnd...]))
     }
 }
 
