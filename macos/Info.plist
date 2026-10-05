@@ -8,6 +8,8 @@
     <string>TokenViewer</string>
     <key>CFBundleExecutable</key>
     <string>TokenViewer</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.tokenviewer.TokenViewer</string>
     <key>CFBundleInfoDictionaryVersion</key>

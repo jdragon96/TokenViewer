@@ -34,6 +34,12 @@ cp "$BIN_DIR/TokenViewer" "$APP/Contents/MacOS/TokenViewer"
 cp "$MACOS_DIR/Info.plist" "$APP/Contents/Info.plist"
 cp "$REPO_ROOT/shared/prices.json" "$APP/Contents/Resources/prices.json"
 
+# The app icon is drawn by a script, like the menu bar item, so the repository holds no image files.
+ICON_WORK="$(mktemp -d)"
+swift "$MACOS_DIR/scripts/make-icon.swift" "$ICON_WORK/AppIcon.iconset"
+iconutil -c icns "$ICON_WORK/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
+rm -r "$ICON_WORK"
+
 PLIST="$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$PLIST"
 # CFBundleVersion only allows dot-separated numbers.
