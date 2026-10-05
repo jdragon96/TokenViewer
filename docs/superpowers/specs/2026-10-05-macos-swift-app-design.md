@@ -110,8 +110,8 @@ LICENSE                       MIT
 
 ### 4.1. 한도 (`UsageFetcher`)
 
-- 주입받는 것: `loadCredential() async -> CredentialResult`, `requestUsage(token) async -> HTTP 결과`, `now() -> Date`, `sleep(Duration) async`.
-  테스트는 가짜를 넣는다.
+- 주입받는 것: `loadCredential() async -> CredentialResult`, `requestUsage(token) async -> HTTP 결과`.
+  테스트는 가짜를 넣고, 시간은 짧은 주기(0.05–0.1초)로 실제 시간을 쓴다.
 - `Task` 하나가 루프를 돈다: 조회 → `RefreshPolicy` 로 다음 지연 계산 → 지연만큼 기다리거나 새로고침 요청이 오면 깬다.
 - 조회 중에 들어온 새로고침 요청은 그 조회의 결과로 처리된 것으로 본다 (Qt 커밋 b19e534 와 같다).
 - 드롭다운을 열 때는 마지막 시도가 30초 넘었을 때만 요청한다.
