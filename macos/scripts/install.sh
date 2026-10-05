@@ -63,6 +63,17 @@ quit_app() {
     pkill -x TokenViewer || true
 }
 
+open_app() {
+    # Right after the old copy quits, LaunchServices can briefly refuse to open the new one (error -600).
+    for _ in 1 2 3 4 5; do
+        if open "$1" 2>/dev/null; then
+            return 0
+        fi
+        sleep 1
+    done
+    fail "앱을 열지 못했습니다. 직접 여세요: $1"
+}
+
 place_app() {
     local source_app="$1" destination
     destination="$(install_dir)/$APP_NAME"
@@ -70,7 +81,7 @@ place_app() {
     rm -rf "$destination"
     ditto "$source_app" "$destination"
     say "설치했습니다: $destination"
-    open "$destination"
+    open_app "$destination"
 }
 
 install_release() {
