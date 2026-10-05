@@ -65,6 +65,19 @@ import Testing
         }
     }
 
+    @Test func savesCorrectedValues() {
+        withDefaults { defaults, store in
+            var values = store.values
+            values.warnPercent = 90
+            values.criticalPercent = 85
+            values.intervalMinutes = 7
+            store.save(values)
+            // The file keeps what every reader would see, not the out-of-range input.
+            #expect(defaults.integer(forKey: "alert.criticalPercent") == 95)
+            #expect(defaults.integer(forKey: "refresh.intervalMinutes") == 3)
+        }
+    }
+
     @Test func readsValuesQtStoredAsStrings() {
         withDefaults { defaults, store in
             defaults.set("85", forKey: "alert.warnPercent")

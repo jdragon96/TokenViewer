@@ -47,34 +47,44 @@ public struct SettingsStore {
 
     /// The stored values, with anything out of range replaced by its default.
     public var values: SettingsValues {
-        let interval = int(Key.interval) ?? Self.defaultInterval
-        let warn = validWarn(int(Key.warn))
-        return SettingsValues(
-            intervalMinutes: Self.allowedIntervals.contains(interval) ? interval : Self.defaultInterval,
-            warnPercent: warn,
-            criticalPercent: validCritical(int(Key.critical), warn: warn),
-            launchAtLogin: bool(Key.launchAtLogin) ?? true,
-            dimension: int(Key.dimension).flatMap(BreakdownDimension.init(rawValue:)) ?? .project,
-            period: int(Key.period).flatMap(BreakdownPeriod.init(rawValue:)) ?? .fiveHourWindow)
+        Self.validated(intervalMinutes: int(Key.interval), warnPercent: int(Key.warn), criticalPercent: int(Key.critical),
+                       launchAtLogin: bool(Key.launchAtLogin), dimension: int(Key.dimension), period: int(Key.period))
     }
 
+    /// Writes the values after the same correction `values` applies, so the file never keeps an out-of-range choice.
     public func save(_ values: SettingsValues) {
-        defaults.set(values.intervalMinutes, forKey: Key.interval)
-        defaults.set(values.warnPercent, forKey: Key.warn)
-        defaults.set(values.criticalPercent, forKey: Key.critical)
-        defaults.set(values.launchAtLogin, forKey: Key.launchAtLogin)
-        defaults.set(values.dimension.rawValue, forKey: Key.dimension)
-        defaults.set(values.period.rawValue, forKey: Key.period)
+        let corrected = Self.validated(intervalMinutes: values.intervalMinutes, warnPercent: values.warnPercent,
+                                       criticalPercent: values.criticalPercent, launchAtLogin: values.launchAtLogin,
+                                       dimension: values.dimension.rawValue, period: values.period.rawValue)
+        defaults.set(corrected.intervalMinutes, forKey: Key.interval)
+        defaults.set(corrected.warnPercent, forKey: Key.warn)
+        defaults.set(corrected.criticalPercent, forKey: Key.critical)
+        defaults.set(corrected.launchAtLogin, forKey: Key.launchAtLogin)
+        defaults.set(corrected.dimension.rawValue, forKey: Key.dimension)
+        defaults.set(corrected.period.rawValue, forKey: Key.period)
     }
 
-    private func validWarn(_ value: Int?) -> Int {
+    private static func validated(intervalMinutes: Int?, warnPercent: Int?, criticalPercent: Int?, launchAtLogin: Bool?,
+                                  dimension: Int?, period: Int?) -> SettingsValues {
+        let interval = intervalMinutes ?? defaultInterval
+        let warn = validWarn(warnPercent)
+        return SettingsValues(
+            intervalMinutes: allowedIntervals.contains(interval) ? interval : defaultInterval,
+            warnPercent: warn,
+            criticalPercent: validCritical(criticalPercent, warn: warn),
+            launchAtLogin: launchAtLogin ?? true,
+            dimension: dimension.flatMap(BreakdownDimension.init(rawValue:)) ?? .project,
+            period: period.flatMap(BreakdownPeriod.init(rawValue:)) ?? .fiveHourWindow)
+    }
+
+    private static func validWarn(_ value: Int?) -> Int {
         guard let value, value >= Self.minWarn, value <= Self.maxWarn, value % Self.percentStep == 0 else {
             return Self.defaultWarn
         }
         return value
     }
 
-    private func validCritical(_ value: Int?, warn: Int) -> Int {
+    private static func validCritical(_ value: Int?, warn: Int) -> Int {
         if let value, value > warn, value <= Self.maxPercent, value % Self.percentStep == 0 {
             return value
         }
