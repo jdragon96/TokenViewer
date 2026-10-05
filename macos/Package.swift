@@ -7,5 +7,6 @@ let package = Package(
     targets: [
         .target(name: "TokenViewerCore"),
         .executableTarget(name: "TokenViewer", dependencies: ["TokenViewerCore"]),
+        .testTarget(name: "TokenViewerCoreTests", dependencies: ["TokenViewerCore"], exclude: ["Fixtures"]),
     ]
 )
