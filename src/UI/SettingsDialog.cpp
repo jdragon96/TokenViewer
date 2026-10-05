@@ -10,9 +10,12 @@
 #include <QEvent>
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPushButton>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace
@@ -49,16 +52,38 @@ void SettingsDialog::LoadFromSettings()
 
 bool SettingsDialog::eventFilter(QObject* watched, QEvent* event)
 {
+    QWidget* pWidget = qobject_cast<QWidget*>(watched);
+    if (!pWidget || (watched != m_pLicenseButton && watched != m_pAboutQtButton))
+    {
+        return QDialog::eventFilter(watched, event);
+    }
+
+    bool bActivated = false;
     if (event->type() == QEvent::MouseButtonRelease)
     {
+        QMouseEvent* pMouse = static_cast<QMouseEvent*>(event);
+        bActivated = pMouse->button() == Qt::LeftButton && pWidget->rect().contains(pMouse->pos());
+    }
+    else if (event->type() == QEvent::KeyRelease)
+    {
+        const int iKey = static_cast<QKeyEvent*>(event)->key();
+        bActivated = iKey == Qt::Key_Space || iKey == Qt::Key_Return || iKey == Qt::Key_Enter;
+    }
+
+    if (bActivated)
+    {
+        // Defer the modal dialogs so they do not run inside the event being delivered.
         if (watched == m_pLicenseButton)
         {
-            LicenseNoticesDialog dialog(this);
-            dialog.exec();
+            QTimer::singleShot(0, this, [this]()
+            {
+                LicenseNoticesDialog dialog(this);
+                dialog.exec();
+            });
         }
-        else if (watched == m_pAboutQtButton)
+        else
         {
-            QMessageBox::aboutQt(this);
+            QTimer::singleShot(0, this, [this]() { QMessageBox::aboutQt(this); });
         }
     }
     return QDialog::eventFilter(watched, event);
@@ -101,6 +126,7 @@ void SettingsDialog::BuildUi()
 
     QHBoxLayout* pBottom = new QHBoxLayout();
     m_pLicenseButton = new QPushButton(QStringLiteral("오픈소스 라이선스"), this);
+    m_pLicenseButton->setObjectName(QStringLiteral("licenseButton"));
     m_pAboutQtButton = new QPushButton(QStringLiteral("Qt 정보"), this);
     m_pLicenseButton->installEventFilter(this);
     m_pAboutQtButton->installEventFilter(this);

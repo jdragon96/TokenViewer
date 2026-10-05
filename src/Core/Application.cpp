@@ -144,7 +144,11 @@ void Application::ApplySettings()
     {
         m_upPopup->Refresh();
     }
-    LoginItem::Apply(m_upSettings->GetLaunchAtLogin(), QCoreApplication::applicationFilePath());
+    const QString strExecutablePath = QCoreApplication::applicationFilePath();
+    if (!LoginItem::Apply(m_upSettings->GetLaunchAtLogin(), strExecutablePath))
+    {
+        qWarning("TokenViewer: launch-at-login registration failed (%s)", qPrintable(strExecutablePath));
+    }
 }
 
 void Application::ShowSettingsDialog()
