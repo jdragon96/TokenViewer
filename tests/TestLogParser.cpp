@@ -73,7 +73,10 @@ void TestLogParser::TestIgnoresNonAssistantLines()
 
 void TestLogParser::TestIgnoresBrokenJson()
 {
-    QCOMPARE(LogParser::ParseLine(kAssistantLine.left(120), QString()).m_eKind, ELineKind::IGNORED);
+    // Cut inside the usage object so the line passes the "usage" prefilter but is not valid JSON.
+    const QByteArray baBroken = kAssistantLine.left(kAssistantLine.indexOf("\"output_tokens\""));
+    QVERIFY(baBroken.contains("\"usage\""));
+    QCOMPARE(LogParser::ParseLine(baBroken, QString()).m_eKind, ELineKind::IGNORED);
 }
 
 void TestLogParser::TestParsesAiTitle()
