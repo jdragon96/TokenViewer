@@ -9,6 +9,8 @@ final class AppController {
 
     private let store: SettingsStore
     private let statusItem = StatusItemController()
+    private lazy var popup = PopupController(content: PopupView(controller: self))
+    private let settingsWindow = SettingsWindowController()
     private var appliedSettings: SettingsValues
     private var fetcher: UsageFetcher?
     private var scanner: LogScanner?
@@ -58,8 +60,29 @@ final class AppController {
         }
     }
 
+    func openSettings() {
+        popup.close()
+        settingsWindow.show(controller: self)
+    }
+
+    func quit() {
+        NSApp.terminate(nil)
+    }
+
     private func handleStatusItemClick() {
-        refreshNow()
+        if popup.isShown {
+            popup.close()
+            return
+        }
+        if popup.wasJustClosed {
+            return
+        }
+        state.tick()
+        if state.usage.isRefreshDueOnOpen(now: state.now) {
+            Task { [fetcher] in await fetcher?.requestRefresh() }
+        }
+        Task { [scanner] in await scanner?.requestRescan() }
+        popup.show(below: statusItem.anchorFrame)
     }
 
     private func receive(_ result: FetchResult) {
