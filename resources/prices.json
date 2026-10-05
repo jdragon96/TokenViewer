@@ -1,0 +1,13 @@
+{
+  "asOf": "2026-09-25",
+  "source": "claude-api skill model table (USD per 1M tokens)",
+  "models": [
+    { "id": "claude-fable-5-1", "family": "fable", "input": 10, "output": 50, "cacheWrite5m": 12.5, "cacheWrite1h": 20, "cacheRead": 0.25, "fastMultiplier": 1 },
+    { "id": "claude-fable-5", "family": "fable", "input": 10, "output": 50, "cacheWrite5m": 12.5, "cacheWrite1h": 20, "cacheRead": 1.0, "fastMultiplier": 1 },
+    { "id": "claude-opus-5-5", "family": "opus", "input": 4, "output": 20, "cacheWrite5m": 5, "cacheWrite1h": 8, "cacheRead": 0.2, "fastMultiplier": 2 },
+    { "id": "claude-opus-5", "family": "opus", "input": 5, "output": 25, "cacheWrite5m": 6.25, "cacheWrite1h": 10, "cacheRead": 0.5, "fastMultiplier": 2 },
+    { "id": "claude-sonnet-5-5", "family": "sonnet", "input": 2, "output": 10, "cacheWrite5m": 2.5, "cacheWrite1h": 4, "cacheRead": 0.2, "fastMultiplier": 1 },
+    { "id": "claude-sonnet-5", "family": "sonnet", "input": 2, "output": 10, "cacheWrite5m": 2.5, "cacheWrite1h": 4, "cacheRead": 0.2, "fastMultiplier": 1 },
+    { "id": "claude-haiku-4-5", "family": "haiku", "input": 1, "output": 5, "cacheWrite5m": 1.25, "cacheWrite1h": 2, "cacheRead": 0.1, "fastMultiplier": 1 }
+  ]
+}

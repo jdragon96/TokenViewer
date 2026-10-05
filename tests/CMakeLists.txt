@@ -7,3 +7,4 @@ function(tv_add_test name)
 endfunction()
 
 tv_add_test(TestTrayIconPainter)
+tv_add_test(TestPriceTable)

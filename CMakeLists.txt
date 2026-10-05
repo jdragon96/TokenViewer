@@ -19,6 +19,7 @@ endforeach()
 
 set(TV_CORE_SOURCES
     src/UI/TrayIconPainter.cpp
+    src/Analysis/PriceTable.cpp
 )
 list(APPEND TV_CORE_SOURCES src/UI/TrayIcon.h src/UI/TrayIcon.cpp)
 
