@@ -34,6 +34,7 @@ private slots:
     void TestStaleAfterSleepEvenIfLastStatusOk();
     void TestKeychainDeniedClearsLimits();
     void TestRefreshDueOnOpenAfter30Seconds();
+    void TestNoOpenRefreshAfterKeychainDenied();
 };
 
 void TestSystemStatus::TestEmptyBeforeFirstFetch()
@@ -88,6 +89,15 @@ void TestSystemStatus::TestRefreshDueOnOpenAfter30Seconds()
     status.ApplyFetchResult(MakeResult(EFetchStatus::OK), kNow);
     QVERIFY(!status.IsRefreshDueOnOpen(kNow.addSecs(10)));
     QVERIFY(status.IsRefreshDueOnOpen(kNow.addSecs(31)));
+}
+
+void TestSystemStatus::TestNoOpenRefreshAfterKeychainDenied()
+{
+    SystemStatus status;
+    status.ApplyFetchResult(MakeResult(EFetchStatus::KEYCHAIN_DENIED), kNow);
+    QVERIFY(!status.IsRefreshDueOnOpen(kNow.addSecs(60)));
+    status.ApplyFetchResult(MakeResult(EFetchStatus::OK), kNow.addSecs(120));
+    QVERIFY(status.IsRefreshDueOnOpen(kNow.addSecs(200)));
 }
 
 QTEST_GUILESS_MAIN(TestSystemStatus)

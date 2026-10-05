@@ -67,6 +67,11 @@ ELimitDisplayState SystemStatus::GetLimitDisplayState(const QDateTime& now) cons
 
 bool SystemStatus::IsRefreshDueOnOpen(const QDateTime& now) const
 {
+    // Only the '다시 확인' button retries after a Keychain denial.
+    if (m_eLastStatus == EFetchStatus::KEYCHAIN_DENIED)
+    {
+        return false;
+    }
     return !m_dtLastAttemptAt.isValid() || m_dtLastAttemptAt.secsTo(now) > kRefreshOnOpenAfterSecs;
 }
 
