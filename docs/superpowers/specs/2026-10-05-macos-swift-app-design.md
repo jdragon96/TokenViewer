@@ -21,7 +21,7 @@ Swift 는 런타임과 SwiftUI·AppKit 이 OS 에 들어 있어 앱이 1–2MB �
 **범위 밖**
 
 - Developer ID 서명·공증 실행. 스크립트에 환경 변수 자리만 만든다.
-- Homebrew cask. 공증이 된 뒤에 한다.
+- Homebrew 공식 cask. 공증이 된 뒤에 한다. (2026-10-06: 개인 tap `jdragon96/homebrew-tap` 은 추가했다. 공증 전이라 첫 실행에 "그래도 열기"가 필요하다)
 - Qt 앱의 Windows/Ubuntu 이식과 Qt 코드의 `qt/` 이동. 다음 작업이다.
 - 자동 업데이트 (Sparkle 등). 다시 설치 스크립트를 실행하면 된다.
 - 라이선스 고지 창. 외부 라이브러리가 없다.
