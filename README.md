@@ -5,7 +5,7 @@ Claude Code 요금제 한도(5시간·주간)를 메뉴바에 늘 보여 주는 
 
 | 플랫폼 | 상태 | 위치 |
 | --- | --- | --- |
-| macOS 14 이상 (Apple Silicon, Intel) | 사용 가능. Swift 네이티브 앱, 약 1MB | `macos/` |
+| macOS 14 이상 (Apple Silicon, Intel) | 사용 가능. Swift 네이티브 앱, 약 1.4MB | `macos/` |
 | Windows, Ubuntu | 준비 중 (Qt) | 저장소 최상위 |
 
 ## macOS
@@ -26,7 +26,8 @@ git clone https://github.com/jdragon96/TokenViewer.git
 TokenViewer/macos/scripts/install.sh --from-source
 ```
 
-제거 (앱, 로그인 항목, 설정, 로그):
+제거: 메뉴바 드롭다운에서 "종료"를 누른 뒤, 응용 프로그램 폴더의 TokenViewer 를 휴지통으로 끌어다 놓으면 됩니다.
+설정과 로그까지 지우려면 (앱, 로그인 항목, 설정, 로그):
 
 ```bash
 curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/install.sh | bash -s -- --uninstall
