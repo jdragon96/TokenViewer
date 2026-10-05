@@ -4,9 +4,11 @@
 #include "Core/Observers.h"
 #include "Core/Settings.h"
 #include "Core/SystemStatus.h"
+#include "Service/LoginItem.h"
 #include "Service/UsageApiClient.h"
 #include "Thread/LogScanThread.h"
 #include "Thread/UsageFetchThread.h"
+#include "UI/SettingsDialog.h"
 #include "UI/TrayIcon.h"
 #include "UI/UsagePopup.h"
 
@@ -40,6 +42,7 @@ Application::Application()
           []() { return UsageApiClient::FetchWithStoredCredential(QDateTime::currentDateTimeUtc()); },
           m_upSettings->GetRefreshIntervalMinutes() * kMsPerMinute))
     , m_upLogScanThread(std::make_unique<LogScanThread>(QDir::homePath() + kProjectsDirectory, kLogScanIntervalMs))
+    , m_upSettingsDialog(nullptr)
     , m_timerStaleCheck()
     , m_lastTrayState()
     , m_bHasTrayState(false)
@@ -88,6 +91,7 @@ void Application::ConnectSignals()
     connect(m_upObservers.get(), &Observers::QuitRequested, qApp, &QCoreApplication::quit);
     // Staleness depends on the clock, so re-check it even when nothing new arrives.
     connect(&m_timerStaleCheck, &QTimer::timeout, this, &Application::UpdateTrayIcon);
+    connect(m_upObservers.get(), &Observers::SettingsWindowRequested, this, &Application::ShowSettingsDialog);
 }
 
 void Application::HandleFetchResult(const FetchResult& result)
@@ -140,6 +144,19 @@ void Application::ApplySettings()
     {
         m_upPopup->Refresh();
     }
+    LoginItem::Apply(m_upSettings->GetLaunchAtLogin(), QCoreApplication::applicationFilePath());
+}
+
+void Application::ShowSettingsDialog()
+{
+    if (!m_upSettingsDialog)
+    {
+        m_upSettingsDialog = std::make_unique<SettingsDialog>(*m_upObservers, m_upSettings.get());
+    }
+    m_upSettingsDialog->LoadFromSettings();
+    m_upSettingsDialog->show();
+    m_upSettingsDialog->raise();
+    m_upSettingsDialog->activateWindow();
 }
 
 TrayIconState Application::BuildTrayIconState() const

@@ -20,3 +20,6 @@ tv_add_test(TestSettings)
 tv_add_test(TestSystemStatus)
 tv_add_test(TestFormatters)
 tv_add_test(TestUsagePopup)
+
+tv_add_test(TestLoginItem)
+tv_add_test(TestSettingsDialog)

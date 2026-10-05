@@ -12,6 +12,7 @@ class Observers;
 class PriceTable;
 class QSettings;
 class Settings;
+class SettingsDialog;
 class SystemStatus;
 class TrayIcon;
 class UsageFetchThread;
@@ -35,6 +36,7 @@ private:
     void UpdateTrayIcon();
     void TogglePopup();
     void ApplySettings();
+    void ShowSettingsDialog();
     TrayIconState BuildTrayIconState() const;
     void WriteBadResponseLog(const FetchResult& result) const;
 
@@ -48,6 +50,7 @@ private:
     std::unique_ptr<UsagePopup> m_upPopup;
     std::unique_ptr<UsageFetchThread> m_upFetchThread;
     std::unique_ptr<LogScanThread> m_upLogScanThread;
+    std::unique_ptr<SettingsDialog> m_upSettingsDialog;
     QTimer m_timerStaleCheck;
     TrayIconState m_lastTrayState;
     bool m_bHasTrayState;

@@ -35,6 +35,11 @@ set(TV_CORE_SOURCES
     src/Service/CredentialStore.cpp
     src/Service/UsageApiClient.cpp
     src/Service/RefreshPolicy.cpp
+    src/Service/LoginItem.cpp
+    src/UI/SettingsDialog.h
+    src/UI/SettingsDialog.cpp
+    src/UI/LicenseNoticesDialog.h
+    src/UI/LicenseNoticesDialog.cpp
     src/Thread/UsageFetchThread.h
     src/Thread/UsageFetchThread.cpp
     src/Thread/LogScanThread.h
