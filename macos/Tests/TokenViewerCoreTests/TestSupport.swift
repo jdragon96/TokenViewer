@@ -12,6 +12,11 @@ enum TestSupport {
 
     static let seoul = TimeZone(identifier: "Asia/Seoul")!
 
+    static func prices() throws -> PriceTable {
+        let data = try Data(contentsOf: repoRoot.appendingPathComponent("shared/prices.json"))
+        return try #require(PriceTable(json: data))
+    }
+
     static func fixture(_ name: String) throws -> Data {
         try Data(contentsOf: repoRoot.appendingPathComponent("macos/Tests/TokenViewerCoreTests/Fixtures/\(name)"))
     }
