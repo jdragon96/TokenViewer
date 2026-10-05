@@ -25,6 +25,10 @@ public struct BreakdownUpdate: Sendable, Equatable {
 
 /// Scans `~/.claude/projects` off the main thread and publishes the breakdown for the current tab and period (spec 4.2).
 public actor LogScanner {
+    // A first scan of a long history takes seconds of blocking file reads; run them on a queue of
+    // their own instead of holding one of the few Swift concurrency pool threads.
+    private let queue = DispatchSerialQueue(label: "com.tokenviewer.logscan", qos: .utility)
+    private let queueKey = DispatchSpecificKey<Bool>()
     private let root: URL
     private let prices: PriceTable?
     private let interval: TimeInterval
@@ -42,6 +46,11 @@ public actor LogScanner {
         self.interval = interval
         self.query = query
         self.onUpdate = onUpdate
+        queue.setSpecific(key: queueKey, value: true)
+    }
+
+    public nonisolated var unownedExecutor: UnownedSerialExecutor {
+        queue.asUnownedSerialExecutor()
     }
 
     public func start() {
@@ -78,6 +87,10 @@ public actor LogScanner {
             await publish()
             await signal.wait(timeout: interval)
         }
+    }
+
+    func isOnScanQueue() -> Bool {
+        DispatchQueue.getSpecific(key: queueKey) == true
     }
 
     private func publish() async {

@@ -67,6 +67,13 @@ import Testing
         await scanner.stop()
     }
 
+    @Test func scansOnItsOwnQueue() async throws {
+        let dir = try TemporaryDirectory()
+        let scanner = try makeScanner(root: dir.url, updates: Recorder())
+        // A first scan of a long history takes seconds; it must not hold a Swift concurrency pool thread.
+        #expect(await scanner.isOnScanQueue())
+    }
+
     @Test func emptyRootPublishesEmptyBreakdown() async throws {
         let dir = try TemporaryDirectory()
         let updates = Recorder<Breakdown>()
