@@ -33,6 +33,7 @@ SettingsDialog::SettingsDialog(Observers& observers, Settings* settings, QWidget
     , m_pLaunchCheck(nullptr)
     , m_pLicenseButton(nullptr)
     , m_pAboutQtButton(nullptr)
+    , m_pKeyPressedButton(nullptr)
     , m_bLoading(false)
 {
     BuildUi();
@@ -64,10 +65,24 @@ bool SettingsDialog::eventFilter(QObject* watched, QEvent* event)
         QMouseEvent* pMouse = static_cast<QMouseEvent*>(event);
         bActivated = pMouse->button() == Qt::LeftButton && pWidget->rect().contains(pMouse->pos());
     }
-    else if (event->type() == QEvent::KeyRelease)
+    else if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease)
     {
-        const int iKey = static_cast<QKeyEvent*>(event)->key();
-        bActivated = iKey == Qt::Key_Space || iKey == Qt::Key_Return || iKey == Qt::Key_Enter;
+        const QKeyEvent* pKey = static_cast<QKeyEvent*>(event);
+        const int iKey = pKey->key();
+        const bool bActivationKey = iKey == Qt::Key_Space || iKey == Qt::Key_Return || iKey == Qt::Key_Enter;
+        if (bActivationKey && !pKey->isAutoRepeat())
+        {
+            if (event->type() == QEvent::KeyPress)
+            {
+                m_pKeyPressedButton = watched;
+            }
+            else
+            {
+                // Only a release that follows a press on this same button counts.
+                bActivated = watched == m_pKeyPressedButton;
+                m_pKeyPressedButton = nullptr;
+            }
+        }
     }
 
     if (bActivated)

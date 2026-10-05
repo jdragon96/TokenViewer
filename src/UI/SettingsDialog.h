@@ -3,6 +3,7 @@
 #include <QDialog>
 
 class Observers;
+class QEvent;
 class QCheckBox;
 class QComboBox;
 class QPushButton;
@@ -35,5 +36,6 @@ private:
     QCheckBox* m_pLaunchCheck;
     QPushButton* m_pLicenseButton;
     QPushButton* m_pAboutQtButton;
+    QObject* m_pKeyPressedButton;
     bool m_bLoading;
 };

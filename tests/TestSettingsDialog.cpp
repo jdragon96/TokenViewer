@@ -25,6 +25,7 @@ private slots:
     void TestLicenseButtonIgnoresRightClick();
     void TestLicenseButtonOpensOnLeftClick();
     void TestLicenseButtonOpensOnSpaceKey();
+    void TestLicenseButtonIgnoresOrphanKeyRelease();
 
 private:
     // Runs the action, lets a deferred dialog open (and closes it), and reports whether one appeared.
@@ -122,6 +123,22 @@ void TestSettingsDialog::TestLicenseButtonOpensOnSpaceKey()
     QVERIFY(OpensLicenseDialog(dialog, [](QPushButton* pButton)
     {
         QTest::keyClick(pButton, Qt::Key_Space);
+    }));
+}
+
+void TestSettingsDialog::TestLicenseButtonIgnoresOrphanKeyRelease()
+{
+    QTemporaryDir dirTemp;
+    QSettings storedSettings(dirTemp.filePath(QStringLiteral("settings.ini")), QSettings::IniFormat);
+    Settings settings(&storedSettings);
+    Observers observers;
+    SettingsDialog dialog(observers, &settings);
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    QVERIFY(!OpensLicenseDialog(dialog, [](QPushButton* pButton)
+    {
+        pButton->setFocus();
+        QTest::keyRelease(pButton, Qt::Key_Return);
     }));
 }
 
