@@ -21,6 +21,6 @@ public:
 
 private:
     static FetchResult FetchBlocking(const QString& accessToken);
-    static LimitWindow ParseWindow(const QJsonValue& value);
+    static LimitWindow ParseWindow(const QJsonValue& value, bool* malformed);
     static QDateTime ParseTimestamp(const QJsonValue& value);
 };

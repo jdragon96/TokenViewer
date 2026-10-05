@@ -15,6 +15,8 @@ private slots:
     void TestNullWindowLeavesMeterEmpty();
     void TestMissingWindowsIsBadResponse();
     void TestNotJsonIsBadResponse();
+    void TestWindowFormatDriftIsBadResponse();
+    void TestNullPercentLeavesMeterEmpty();
     void TestMapsHttpStatuses();
     void TestParsesRecordedResponseShape();
 };
@@ -72,6 +74,28 @@ void TestUsageApiClient::TestNotJsonIsBadResponse()
     QCOMPARE(UsageApiClient::ParseUsageResponse(QByteArrayLiteral("<html>")).m_eStatus, EFetchStatus::BAD_RESPONSE);
 }
 
+void TestUsageApiClient::TestWindowFormatDriftIsBadResponse()
+{
+    const QByteArray baDrift = QByteArrayLiteral(R"({"five_hour":{"percent":42},"seven_day":null})");
+    const FetchResult resultDrift = UsageApiClient::ParseUsageResponse(baDrift);
+    QCOMPARE(resultDrift.m_eStatus, EFetchStatus::BAD_RESPONSE);
+    QCOMPARE(resultDrift.m_baRawBody, baDrift);
+
+    const FetchResult resultString = UsageApiClient::ParseUsageResponse(QByteArrayLiteral(
+        R"({"five_hour":"42","seven_day":{"utilization":10}})"));
+    QCOMPARE(resultString.m_eStatus, EFetchStatus::BAD_RESPONSE);
+}
+
+void TestUsageApiClient::TestNullPercentLeavesMeterEmpty()
+{
+    const FetchResult result = UsageApiClient::ParseUsageResponse(QByteArrayLiteral(
+        R"({"five_hour":{"utilization":null},"seven_day":{"utilization":10}})"));
+    QCOMPARE(result.m_eStatus, EFetchStatus::OK);
+    QVERIFY(!result.m_limits.m_fiveHour.m_bValid);
+    QVERIFY(result.m_limits.m_sevenDay.m_bValid);
+    QCOMPARE(result.m_limits.m_sevenDay.m_dPercent, 10.0);
+}
+
 void TestUsageApiClient::TestMapsHttpStatuses()
 {
     QCOMPARE(UsageApiClient::MapHttpResult(401, true, QString(), QByteArray()).m_eStatus, EFetchStatus::TOKEN_EXPIRED);
@@ -83,6 +107,8 @@ void TestUsageApiClient::TestMapsHttpStatuses()
     const FetchResult resultNetwork = UsageApiClient::MapHttpResult(0, true, QStringLiteral("Host not found"), QByteArray());
     QCOMPARE(resultNetwork.m_eStatus, EFetchStatus::NETWORK_ERROR);
     QVERIFY(resultNetwork.m_strDetail.contains(QStringLiteral("Host not found")));
+
+    QCOMPARE(UsageApiClient::MapHttpResult(200, true, QStringLiteral("Connection closed"), QByteArrayLiteral("{\"five_hour")).m_eStatus, EFetchStatus::NETWORK_ERROR);
 
     const FetchResult resultOk = UsageApiClient::MapHttpResult(200, false, QString(), QByteArrayLiteral(R"({"five_hour":{"utilization":1}})"));
     QCOMPARE(resultOk.m_eStatus, EFetchStatus::OK);

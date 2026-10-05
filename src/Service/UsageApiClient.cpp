@@ -59,7 +59,7 @@ FetchResult UsageApiClient::FetchWithStoredCredential(const QDateTime& now)
 
 FetchResult UsageApiClient::MapHttpResult(int httpStatus, bool networkError, const QString& errorText, const QByteArray& body)
 {
-    if (httpStatus == kHttpOk)
+    if (httpStatus == kHttpOk && !networkError)
     {
         return ParseUsageResponse(body);
     }
@@ -81,7 +81,7 @@ FetchResult UsageApiClient::MapHttpResult(int httpStatus, bool networkError, con
         result.m_eStatus = EFetchStatus::SERVER_ERROR;
         result.m_strDetail = QStringLiteral("서버 오류 (HTTP %1)").arg(httpStatus);
     }
-    else if (httpStatus == 0)
+    else if (httpStatus == 0 || httpStatus == kHttpOk)
     {
         result.m_eStatus = EFetchStatus::NETWORK_ERROR;
         result.m_strDetail = errorText.isEmpty() ? QStringLiteral("네트워크 연결 없음") : errorText;
@@ -109,8 +109,16 @@ FetchResult UsageApiClient::ParseUsageResponse(const QByteArray& body)
         return result;
     }
     result.m_eStatus = EFetchStatus::OK;
-    result.m_limits.m_fiveHour = ParseWindow(objRoot.value(kFiveHourKey));
-    result.m_limits.m_sevenDay = ParseWindow(objRoot.value(kSevenDayKey));
+    bool bMalformed = false;
+    result.m_limits.m_fiveHour = ParseWindow(objRoot.value(kFiveHourKey), &bMalformed);
+    result.m_limits.m_sevenDay = ParseWindow(objRoot.value(kSevenDayKey), &bMalformed);
+    if (bMalformed)
+    {
+        result.m_limits = UsageLimits();
+        result.m_eStatus = EFetchStatus::BAD_RESPONSE;
+        result.m_strDetail = QStringLiteral("five_hour / seven_day 형식이 바뀌었습니다");
+        result.m_baRawBody = body;
+    }
     return result;
 }
 
@@ -146,21 +154,36 @@ FetchResult UsageApiClient::FetchBlocking(const QString& accessToken)
     return MapHttpResult(iHttpStatus, bNetworkError, pReply->errorString(), pReply->readAll());
 }
 
-LimitWindow UsageApiClient::ParseWindow(const QJsonValue& value)
+LimitWindow UsageApiClient::ParseWindow(const QJsonValue& value, bool* malformed)
 {
     LimitWindow window;
-    if (!value.isObject())
+    if (value.isNull() || value.isUndefined())
     {
         return window;
     }
+    if (!value.isObject())
+    {
+        *malformed = true;
+        return window;
+    }
     const QJsonObject objWindow = value.toObject();
-    QJsonValue jvPercent = objWindow.value(QStringLiteral("utilization"));
+    const QString strUtilization = QStringLiteral("utilization");
+    const QString strUsedPercentage = QStringLiteral("used_percentage");
+    if (!objWindow.contains(strUtilization) && !objWindow.contains(strUsedPercentage))
+    {
+        *malformed = true;
+        return window;
+    }
+    QJsonValue jvPercent = objWindow.value(strUtilization);
     if (!jvPercent.isDouble())
     {
-        jvPercent = objWindow.value(QStringLiteral("used_percentage"));
+        jvPercent = objWindow.value(strUsedPercentage);
     }
     if (!jvPercent.isDouble())
     {
+        // A percent key that is null leaves the meter empty; any other type is format drift.
+        const QJsonValue jvPresent = objWindow.contains(strUtilization) ? objWindow.value(strUtilization) : objWindow.value(strUsedPercentage);
+        *malformed = *malformed || !jvPresent.isNull();
         return window;
     }
     window.m_bValid = true;
