@@ -32,6 +32,9 @@ set(TV_CORE_SOURCES
     src/Thread/UsageFetchThread.cpp
     src/Thread/LogScanThread.h
     src/Thread/LogScanThread.cpp
+    src/Core/Settings.cpp
+    src/Core/SystemStatus.cpp
+    src/Core/Observers.h
 )
 if(TV_NATIVE_TRAY)
     enable_language(OBJCXX)
