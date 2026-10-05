@@ -167,7 +167,8 @@ QDateTime TokenAggregator::CalculatePeriodStart(EBreakdownPeriod period, const Q
     switch (period)
     {
     case EBreakdownPeriod::FIVE_HOUR_WINDOW:
-        return fiveHourResetsAt.isValid() ? fiveHourResetsAt.addSecs(-kFiveHourSecs).toUTC() : now.addSecs(-kFiveHourSecs).toUTC();
+        // A reset time that has already passed belongs to the previous window.
+        return (fiveHourResetsAt.isValid() && fiveHourResetsAt > now) ? fiveHourResetsAt.addSecs(-kFiveHourSecs).toUTC() : now.addSecs(-kFiveHourSecs).toUTC();
     case EBreakdownPeriod::TODAY:
         return QDateTime(now.toLocalTime().date(), QTime(0, 0), Qt::LocalTime).toUTC();
     case EBreakdownPeriod::SEVEN_DAYS:

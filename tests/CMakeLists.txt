@@ -23,3 +23,4 @@ tv_add_test(TestUsagePopup)
 
 tv_add_test(TestLoginItem)
 tv_add_test(TestSettingsDialog)
+tv_add_test(TestClockJumpDetector)

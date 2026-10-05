@@ -46,6 +46,7 @@ set(TV_CORE_SOURCES
     src/Thread/LogScanThread.cpp
     src/Core/Settings.cpp
     src/Core/SystemStatus.cpp
+    src/Core/ClockJumpDetector.cpp
     src/Core/Observers.h
     src/Core/Application.h
     src/Core/Application.cpp

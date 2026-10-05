@@ -180,6 +180,9 @@ void TestTokenAggregator::TestCalculatesFiveHourWindowStart()
         QDateTime(QDate(2026, 10, 5), QTime(0, 0), Qt::UTC));
     QCOMPARE(TokenAggregator::CalculatePeriodStart(EBreakdownPeriod::SEVEN_DAYS, dtNow, QDateTime()),
         QDateTime(QDate(2026, 9, 28), QTime(5, 0), Qt::UTC));
+    // A reset time already in the past is stale; fall back to now - 5h.
+    QCOMPARE(TokenAggregator::CalculatePeriodStart(EBreakdownPeriod::FIVE_HOUR_WINDOW, dtNow, dtNow.addSecs(-3600)),
+        QDateTime(QDate(2026, 10, 5), QTime(0, 0), Qt::UTC));
 }
 
 void TestTokenAggregator::TestCalculatesTodayFromLocalMidnight()

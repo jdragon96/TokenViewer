@@ -19,7 +19,12 @@ void SystemStatus::ApplyFetchResult(const FetchResult& result, const QDateTime& 
     m_dtLastAttemptAt = now;
     m_eLastStatus = result.m_eStatus;
     m_strLastDetail = result.m_strDetail;
-    if (!result.m_strPlanLabel.isEmpty())
+    if (result.m_eStatus == EFetchStatus::NOT_LOGGED_IN || result.m_eStatus == EFetchStatus::KEYCHAIN_DENIED)
+    {
+        // The account is unknown, so the old plan badge no longer applies.
+        m_strPlanLabel.clear();
+    }
+    else if (!result.m_strPlanLabel.isEmpty())
     {
         m_strPlanLabel = result.m_strPlanLabel;
     }

@@ -22,7 +22,9 @@ namespace
 {
 constexpr int kMsPerMinute = 60 * 1000;
 constexpr int kLogScanIntervalMs = 60 * 1000;
-constexpr int kStaleCheckMs = 60 * 1000;
+constexpr int kStaleCheckMs = 5 * 1000;
+constexpr qint64 kClockJumpThresholdMs = 30 * 1000;
+constexpr int kWakeRefreshDelayMs = 8 * 1000;
 const QString kPricesResource = QStringLiteral(":/prices.json");
 const QString kProjectsDirectory = QStringLiteral("/.claude/projects");
 const QString kLogDirectory = QStringLiteral("/Library/Logs/TokenViewer");
@@ -44,6 +46,7 @@ Application::Application()
     , m_upLogScanThread(std::make_unique<LogScanThread>(QDir::homePath() + kProjectsDirectory, kLogScanIntervalMs))
     , m_upSettingsDialog(nullptr)
     , m_timerStaleCheck()
+    , m_clockJumpDetector(kClockJumpThresholdMs)
     , m_lastTrayState()
     , m_bHasTrayState(false)
 {
@@ -72,6 +75,20 @@ void Application::Start()
     m_timerStaleCheck.start(kStaleCheckMs);
 }
 
+void Application::HandleClockTick()
+{
+    UpdateTrayIcon();
+    if (m_clockJumpDetector.CheckTick(QDateTime::currentDateTimeUtc()))
+    {
+        // The Mac slept; the delay lets the network come back before refreshing.
+        QTimer::singleShot(kWakeRefreshDelayMs, this, [this]()
+        {
+            m_upFetchThread->RequestRefresh();
+            m_upLogScanThread->RequestRescan();
+        });
+    }
+}
+
 void Application::ConnectSignals()
 {
     connect(m_upFetchThread.get(), &UsageFetchThread::FetchCompleted, this, &Application::HandleFetchResult);
@@ -90,7 +107,7 @@ void Application::ConnectSignals()
     });
     connect(m_upObservers.get(), &Observers::QuitRequested, qApp, &QCoreApplication::quit);
     // Staleness depends on the clock, so re-check it even when nothing new arrives.
-    connect(&m_timerStaleCheck, &QTimer::timeout, this, &Application::UpdateTrayIcon);
+    connect(&m_timerStaleCheck, &QTimer::timeout, this, &Application::HandleClockTick);
     connect(m_upObservers.get(), &Observers::SettingsWindowRequested, this, &Application::ShowSettingsDialog);
 }
 

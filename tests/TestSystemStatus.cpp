@@ -33,6 +33,7 @@ private slots:
     void TestFailureKeepsValuesThenTurnsStale();
     void TestStaleAfterSleepEvenIfLastStatusOk();
     void TestKeychainDeniedClearsLimits();
+    void TestLoggedOutClearsPlanLabel();
     void TestRefreshDueOnOpenAfter30Seconds();
     void TestNoOpenRefreshAfterKeychainDenied();
 };
@@ -53,6 +54,15 @@ void TestSystemStatus::TestOkStoresLimitsAndPlan()
     QCOMPARE(status.GetLimits().m_fiveHour.m_dPercent, 42.0);
     QCOMPARE(status.GetPlanLabel(), QStringLiteral("Max 5x"));
     QCOMPARE(status.GetLastSuccessAt(), kNow);
+}
+
+void TestSystemStatus::TestLoggedOutClearsPlanLabel()
+{
+    SystemStatus status;
+    status.ApplyFetchResult(MakeResult(EFetchStatus::OK), kNow);
+    QCOMPARE(status.GetPlanLabel(), QStringLiteral("Max 5x"));
+    status.ApplyFetchResult(MakeResult(EFetchStatus::NOT_LOGGED_IN), kNow.addSecs(60));
+    QVERIFY(status.GetPlanLabel().isEmpty());
 }
 
 void TestSystemStatus::TestFailureKeepsValuesThenTurnsStale()

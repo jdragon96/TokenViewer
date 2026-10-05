@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/ClockJumpDetector.h"
 #include "UI/TrayIconPainter.h"
 
 #include <QObject>
@@ -34,6 +35,7 @@ private:
     void ConnectSignals();
     void HandleFetchResult(const FetchResult& result);
     void UpdateTrayIcon();
+    void HandleClockTick();
     void TogglePopup();
     void ApplySettings();
     void ShowSettingsDialog();
@@ -52,6 +54,7 @@ private:
     std::unique_ptr<LogScanThread> m_upLogScanThread;
     std::unique_ptr<SettingsDialog> m_upSettingsDialog;
     QTimer m_timerStaleCheck;
+    ClockJumpDetector m_clockJumpDetector;
     TrayIconState m_lastTrayState;
     bool m_bHasTrayState;
 };

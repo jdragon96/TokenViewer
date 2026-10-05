@@ -48,7 +48,6 @@ constexpr double kBorderAlpha = 0.12;
 
 const QColor kBlueLight(0x2a, 0x78, 0xd6);
 const QColor kBlueDark(0x39, 0x87, 0xe5);
-const QColor kFailRed(0xd0, 0x3b, 0x3b);
 
 const char* const kPopupStyleSheet = R"(
 QPushButton[segment="true"] { border: none; border-radius: 5px; padding: 3px 0px; font-size: 11px; background: transparent; }
@@ -399,7 +398,7 @@ void UsagePopup::RefreshFooter(const QDateTime& now)
         m_pFooterLabel->setText(dtSuccess.isValid()
             ? QStringLiteral("갱신 실패 · %1").arg(Formatters::FormatAge(dtSuccess, now))
             : QStringLiteral("한도 정보 없음"));
-        palFooter.setColor(QPalette::WindowText, kFailRed);
+        palFooter.setColor(QPalette::WindowText, TrayIconPainter::GetLevelColor(EBarLevel::CRITICAL, IsDarkAppearance() ? EMenuBarAppearance::DARK : EMenuBarAppearance::LIGHT));
     }
     else if (dtSuccess.isValid())
     {
