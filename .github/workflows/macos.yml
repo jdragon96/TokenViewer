@@ -1,0 +1,48 @@
+name: macOS
+
+on:
+  push:
+    branches: [main]
+    # Path filters are not evaluated for tag pushes, so every v* tag builds a release.
+    tags: ['v*']
+    paths:
+      - 'macos/**'
+      - 'shared/**'
+      - '.github/workflows/macos.yml'
+  pull_request:
+    paths:
+      - 'macos/**'
+      - 'shared/**'
+      - '.github/workflows/macos.yml'
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        working-directory: macos
+        run: swift test
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app
+        working-directory: macos
+        env:
+          TV_VERSION: ${{ github.ref_name }}
+          TV_REPO: ${{ github.repository }}
+        run: ./scripts/build-app.sh
+      - name: Prepare install script
+        run: sed 's#^RELEASE_REPO=.*#RELEASE_REPO="${{ github.repository }}"#' macos/scripts/install.sh > macos/dist/install.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" macos/dist/TokenViewer-macos.zip macos/dist/TokenViewer-macos.zip.sha256 macos/dist/install.sh --clobber
