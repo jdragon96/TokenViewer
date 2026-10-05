@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
 project(TokenViewer VERSION 0.1.0 LANGUAGES CXX)
 
+option(TV_NATIVE_TRAY "Use the Objective-C++ NSStatusItem tray icon" ON)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -26,11 +28,20 @@ set(TV_CORE_SOURCES
     src/Thread/LogScanThread.h
     src/Thread/LogScanThread.cpp
 )
-list(APPEND TV_CORE_SOURCES src/UI/TrayIcon.h src/UI/TrayIcon.cpp)
+if(TV_NATIVE_TRAY)
+    enable_language(OBJCXX)
+    list(APPEND TV_CORE_SOURCES src/UI/TrayIcon.h src/UI/TrayIconMac.mm)
+    set_source_files_properties(src/UI/TrayIconMac.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+else()
+    list(APPEND TV_CORE_SOURCES src/UI/TrayIcon.h src/UI/TrayIcon.cpp)
+endif()
 
 add_library(TokenViewerCore STATIC ${TV_CORE_SOURCES})
 target_include_directories(TokenViewerCore PUBLIC src)
 target_link_libraries(TokenViewerCore PUBLIC Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Network)
+if(TV_NATIVE_TRAY)
+    target_link_libraries(TokenViewerCore PUBLIC "-framework AppKit")
+endif()
 target_compile_definitions(TokenViewerCore PUBLIC TV_VERSION="${PROJECT_VERSION}")
 
 add_executable(TokenViewer MACOSX_BUNDLE src/main.cpp)
