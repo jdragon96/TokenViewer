@@ -11,7 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui Widgets Network Test)
 
-# LGPLv3: Qt must stay a shared library (docs/LicenseCompliance.md).
+# LGPLv3: Qt must stay a shared library.
 foreach(_module Core Gui Widgets Network)
     get_target_property(_type Qt5::${_module} TYPE)
     if(NOT _type STREQUAL "SHARED_LIBRARY")
