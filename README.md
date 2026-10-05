@@ -13,7 +13,7 @@ Claude Code 요금제 한도(5시간·주간)를 메뉴바에 늘 보여 주는 
 ### 설치
 
 ```bash
-curl -fsSL https://github.com/<owner>/TokenViewer/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/install.sh | bash
 ```
 
 최신 릴리스를 내려받아 SHA-256 을 확인하고 `/Applications` (쓸 수 없으면 `~/Applications`) 에 설치한 뒤 실행합니다.
@@ -22,14 +22,14 @@ sudo 는 쓰지 않습니다. 같은 명령으로 업데이트합니다.
 소스에서 설치 (Xcode 16 이상 필요):
 
 ```bash
-git clone https://github.com/<owner>/TokenViewer.git
+git clone https://github.com/jdragon96/TokenViewer.git
 TokenViewer/macos/scripts/install.sh --from-source
 ```
 
 제거 (앱, 로그인 항목, 설정, 로그):
 
 ```bash
-curl -fsSL https://github.com/<owner>/TokenViewer/releases/latest/download/install.sh | bash -s -- --uninstall
+curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/install.sh | bash -s -- --uninstall
 ```
 
 ### 처음 실행할 때

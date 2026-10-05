@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs, updates or removes TokenViewer.app (spec 5.2).
-#   curl -fsSL https://github.com/<owner>/TokenViewer/releases/latest/download/install.sh | bash
+#   curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/install.sh | bash
 #   ./install.sh --from-source     build this checkout and install it
 #   ./install.sh --uninstall       remove the app, its login item, settings and logs
 # Environment: TV_REPO=owner/name, TV_RELEASE_BASE=<url> (defaults to the latest GitHub release).
