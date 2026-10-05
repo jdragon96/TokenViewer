@@ -93,6 +93,27 @@ import Testing
         #expect(store.snapshot.records.map(\.key) == ["new|req-1"])
     }
 
+    @Test func prunesTitlesWithTheirRecords() throws {
+        let dir = try TemporaryDirectory()
+        let old = TestSupport.isoString(now.addingTimeInterval(-32 * 86_400))
+        try dir.write("p/old.jsonl", [LogLines.title(sessionId: "s-old", title: "지난달"), LogLines.assistant(id: "a", sessionId: "s-old", timestamp: old)])
+        try dir.write("p/new.jsonl", [LogLines.title(sessionId: "s-new", title: "오늘"), LogLines.assistant(id: "b", sessionId: "s-new")])
+        let store = LogStore()
+        store.scan(root: dir.url, now: now)
+        #expect(store.snapshot.sessionTitles == ["s-new": "오늘"])
+    }
+
+    @Test func forgetsTitlesOfDeletedFiles() throws {
+        let dir = try TemporaryDirectory()
+        let deleted = try dir.write("p/gone.jsonl", [LogLines.title(sessionId: "s-gone", title: "지운 세션"), LogLines.assistant(id: "a", sessionId: "s-gone")])
+        try dir.write("p/kept.jsonl", [LogLines.title(sessionId: "s-kept", title: "남은 세션"), LogLines.assistant(id: "b", sessionId: "s-kept")])
+        let store = LogStore()
+        store.scan(root: dir.url, now: now)
+        try FileManager.default.removeItem(at: deleted)
+        store.scan(root: dir.url, now: now)
+        #expect(store.snapshot.sessionTitles == ["s-kept": "남은 세션"])
+    }
+
     @Test func missingRootIsEmpty() throws {
         let dir = try TemporaryDirectory()
         let store = LogStore()

@@ -58,9 +58,7 @@ public final class LogStore {
             }
             if size < cursor.offset {
                 // Truncated or replaced: drop what this file contributed and read it again.
-                for key in cursor.keys {
-                    records.removeValue(forKey: key)
-                }
+                remove(cursor.keys)
                 cursor = FileCursor()
                 changed = true
             }
@@ -120,14 +118,36 @@ public final class LogStore {
         guard let cursor = cursors.removeValue(forKey: path) else {
             return
         }
-        for key in cursor.keys {
-            records.removeValue(forKey: key)
-        }
+        remove(cursor.keys)
     }
 
     private func prune(cutoff: Date) -> Bool {
-        let before = records.count
-        records = records.filter { $0.value.timestamp >= cutoff }
-        return records.count != before
+        let expired = Set(records.filter { $0.value.timestamp < cutoff }.keys)
+        guard !expired.isEmpty else {
+            return false
+        }
+        remove(expired)
+        for path in cursors.keys {
+            cursors[path]?.keys.subtract(expired)
+        }
+        return true
+    }
+
+    /// Drops records, and the titles of sessions left with no record. A title that arrives before its
+    /// session's first record stays, because that session never had a record here.
+    private func remove(_ keys: Set<String>) {
+        var touchedSessions = Set<String>()
+        for key in keys {
+            if let record = records.removeValue(forKey: key) {
+                touchedSessions.insert(record.sessionId)
+            }
+        }
+        guard !touchedSessions.isEmpty else {
+            return
+        }
+        let liveSessions = Set(records.values.map(\.sessionId))
+        for sessionId in touchedSessions.subtracting(liveSessions) {
+            sessionTitles.removeValue(forKey: sessionId)
+        }
     }
 }
