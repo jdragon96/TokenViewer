@@ -27,6 +27,9 @@ set(TV_CORE_SOURCES
     src/Analysis/LogStore.cpp
     src/Service/CredentialStore.cpp
     src/Service/UsageApiClient.cpp
+    src/Service/RefreshPolicy.cpp
+    src/Thread/UsageFetchThread.h
+    src/Thread/UsageFetchThread.cpp
     src/Thread/LogScanThread.h
     src/Thread/LogScanThread.cpp
 )
