@@ -22,6 +22,9 @@ set(TV_CORE_SOURCES
     src/Analysis/PriceTable.cpp
     src/Analysis/LogParser.cpp
     src/Analysis/TokenAggregator.cpp
+    src/Analysis/LogStore.cpp
+    src/Thread/LogScanThread.h
+    src/Thread/LogScanThread.cpp
 )
 list(APPEND TV_CORE_SOURCES src/UI/TrayIcon.h src/UI/TrayIcon.cpp)
 
