@@ -72,6 +72,24 @@ import Testing
         await fetcher.stop()
     }
 
+    @Test func automaticRefreshDoesNotRetryKeychainDenial() async {
+        let lookups = Recorder<Int>()
+        let results = Recorder<FetchResult>()
+        let fetcher = UsageFetcher(environment: environment(credential: {
+            await lookups.append(1)
+            return CredentialResult(status: .accessDenied)
+        }), interval: 60, onResult: { await results.append($0) })
+        await fetcher.start()
+        #expect(await waitUntil { await results.values.count == 1 })
+        // Waking from sleep must not bring the Keychain prompt back on its own.
+        await fetcher.requestRefresh(userInitiated: false)
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        #expect(await lookups.values.count == 1)
+        await fetcher.requestRefresh(userInitiated: true)
+        #expect(await waitUntil { await lookups.values.count == 2 })
+        await fetcher.stop()
+    }
+
     @Test func rateLimitBacksOff() async {
         let results = Recorder<FetchResult>()
         let fetcher = UsageFetcher(environment: environment(response: { _ in HTTPResponse(status: 429) }),

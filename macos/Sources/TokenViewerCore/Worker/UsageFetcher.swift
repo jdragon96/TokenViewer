@@ -20,6 +20,7 @@ public actor UsageFetcher {
     private var interval: TimeInterval
     private var loop: Task<Void, Never>?
     private var isFetching = false
+    private var lastStatus: FetchStatus?
 
     public init(environment: UsageFetchEnvironment, interval: TimeInterval, onResult: @escaping @Sendable (FetchResult) async -> Void) {
         self.environment = environment
@@ -41,8 +42,9 @@ public actor UsageFetcher {
     }
 
     /// A request made while a fetch is running is answered by that fetch, so prompts and calls never stack up.
-    public func requestRefresh() async {
-        guard !isFetching else {
+    /// After a Keychain denial only the user may ask again; an automatic request (waking from sleep) would bring the prompt back.
+    public func requestRefresh(userInitiated: Bool = true) async {
+        guard !isFetching, userInitiated || lastStatus != .keychainDenied else {
             return
         }
         await signal.wake()
@@ -82,6 +84,7 @@ public actor UsageFetcher {
             isFetching = true
             let result = await fetchOnce()
             isFetching = false
+            lastStatus = result.status
             let decision = RefreshPolicy.next(after: result.status, baseInterval: interval, previousDelay: backoff)
             backoff = decision.delay
             await onResult(result)

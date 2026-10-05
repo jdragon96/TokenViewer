@@ -79,7 +79,7 @@ final class AppController {
         }
         state.tick()
         if state.usage.isRefreshDueOnOpen(now: state.now) {
-            Task { [fetcher] in await fetcher?.requestRefresh() }
+            Task { [fetcher] in await fetcher?.requestRefresh(userInitiated: false) }
         }
         Task { [scanner] in await scanner?.requestRescan() }
         popup.show(below: statusItem.anchorFrame)
@@ -160,9 +160,10 @@ final class AppController {
 
     private func scheduleWakeRefresh() {
         // The delay lets the network come back before refreshing.
-        Task { [weak self] in
+        Task { [fetcher, scanner] in
             try? await Task.sleep(nanoseconds: UInt64(AppConstants.wakeRefreshDelay * 1_000_000_000))
-            self?.refreshNow()
+            await fetcher?.requestRefresh(userInitiated: false)
+            await scanner?.requestRescan()
         }
     }
 
