@@ -20,11 +20,21 @@ endforeach()
 set(TV_CORE_SOURCES
     src/UI/TrayIconPainter.cpp
 )
+list(APPEND TV_CORE_SOURCES src/UI/TrayIcon.h src/UI/TrayIcon.cpp)
 
 add_library(TokenViewerCore STATIC ${TV_CORE_SOURCES})
 target_include_directories(TokenViewerCore PUBLIC src)
 target_link_libraries(TokenViewerCore PUBLIC Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Network)
 target_compile_definitions(TokenViewerCore PUBLIC TV_VERSION="${PROJECT_VERSION}")
+
+add_executable(TokenViewer MACOSX_BUNDLE src/main.cpp)
+set_target_properties(TokenViewer PROPERTIES
+    MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/resources/Info.plist.in
+    MACOSX_BUNDLE_GUI_IDENTIFIER com.tokenviewer.TokenViewer
+    MACOSX_BUNDLE_BUNDLE_NAME TokenViewer
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION})
+target_link_libraries(TokenViewer PRIVATE TokenViewerCore)
 
 enable_testing()
 add_subdirectory(tests)
