@@ -21,6 +21,13 @@ endforeach()
 
 set(TV_CORE_SOURCES
     src/UI/TrayIconPainter.cpp
+    src/UI/Formatters.cpp
+    src/UI/LimitMeterWidget.h
+    src/UI/LimitMeterWidget.cpp
+    src/UI/BreakdownListWidget.h
+    src/UI/BreakdownListWidget.cpp
+    src/UI/UsagePopup.h
+    src/UI/UsagePopup.cpp
     src/Analysis/PriceTable.cpp
     src/Analysis/LogParser.cpp
     src/Analysis/TokenAggregator.cpp
