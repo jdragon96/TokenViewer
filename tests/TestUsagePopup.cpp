@@ -42,6 +42,8 @@ private slots:
     void TestShowsLoginNoticeWhenNotLoggedIn();
     void TestListsBreakdownRowsAndEmptyState();
     void TestSegmentClickChangesDimension();
+    void TestHeightFollowsRowCount();
+    void TestIgnoresRightClick();
 
 private:
     std::unique_ptr<QTemporaryDir> m_upDir;
@@ -134,6 +136,44 @@ void TestUsagePopup::TestSegmentClickChangesDimension()
     QTest::mouseClick(pModelButton, Qt::LeftButton);
     QCOMPARE(m_upSettings->GetDimension(), EBreakdownDimension::MODEL);
     QVERIFY(pModelButton->isChecked());
+}
+
+void TestUsagePopup::TestHeightFollowsRowCount()
+{
+    UsagePopup popup(*m_upObservers, m_upStatus.get(), m_upSettings.get(), &m_priceTable);
+    popup.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&popup));
+
+    LogSnapshot snapshot;
+    for (int i = 0; i < 5; ++i)
+    {
+        snapshot.m_vecRecords.append(MakeRecentRecord(QStringLiteral("k%1").arg(i), QStringLiteral("/Users/me/P%1").arg(i)));
+    }
+    m_upStatus->ApplyLogSnapshot(snapshot);
+    popup.Refresh();
+    const int iTallHeight = popup.height();
+
+    LogSnapshot single;
+    single.m_vecRecords = { MakeRecentRecord(QStringLiteral("k0"), QStringLiteral("/Users/me/P0")) };
+    m_upStatus->ApplyLogSnapshot(single);
+    popup.Refresh();
+    QVERIFY(popup.height() < iTallHeight);
+    const int iShortHeight = popup.height();
+
+    m_upStatus->ApplyLogSnapshot(snapshot);
+    popup.Refresh();
+    QCOMPARE(popup.height(), iTallHeight);
+    QVERIFY(popup.height() > iShortHeight);
+}
+
+void TestUsagePopup::TestIgnoresRightClick()
+{
+    UsagePopup popup(*m_upObservers, m_upStatus.get(), m_upSettings.get(), &m_priceTable);
+    popup.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&popup));
+    QPushButton* pSessionButton = popup.findChild<QPushButton*>(QStringLiteral("sessionButton"));
+    QTest::mouseClick(pSessionButton, Qt::RightButton);
+    QVERIFY(m_upSettings->GetDimension() != EBreakdownDimension::SESSION);
 }
 
 QTEST_MAIN(TestUsagePopup)

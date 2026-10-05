@@ -17,6 +17,7 @@
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPushButton>
 #include <QScreen>
@@ -166,6 +167,12 @@ bool UsagePopup::eventFilter(QObject* watched, QEvent* event)
 {
     if (event->type() == QEvent::MouseButtonRelease)
     {
+        const QMouseEvent* pMouse = static_cast<QMouseEvent*>(event);
+        const QWidget* pWatched = qobject_cast<QWidget*>(watched);
+        if (pWatched == nullptr || pMouse->button() != Qt::LeftButton || !pWatched->rect().contains(pMouse->pos()))
+        {
+            return QWidget::eventFilter(watched, event);
+        }
         if (watched == m_pRefreshButton || watched == m_pRetryButton)
         {
             emit m_observers.RefreshRequested();

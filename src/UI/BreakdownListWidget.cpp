@@ -131,9 +131,11 @@ void BreakdownListWidget::SetBreakdown(const Breakdown& breakdown, const QColor&
         const double dRatio = dMaxCost > 0.0 ? std::min(row.m_dCostUsd / dMaxCost, 1.0) : 0.0;
         QWidget* pRow = new BreakdownRowWidget(row, dRatio, fillColor, this);
         m_pLayout->addWidget(pRow);
+        pRow->show();
         m_lstRows.append(pRow);
     }
     m_pEmptyLabel->setVisible(m_lstRows.isEmpty());
+    updateGeometry();
 }
 
 int BreakdownListWidget::GetRowCount() const
