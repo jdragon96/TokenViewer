@@ -84,13 +84,15 @@ void UsageFetchThreadWorker::DoWork()
         if (bManual || bDue)
         {
             const FetchResult result = m_pimpl->m_funcFetch();
+            // The in-flight result satisfies any refresh request made while it was running.
+            m_pimpl->m_bRefreshRequested = false;
             emit FetchCompleted(result);
             const RefreshDecision decision = RefreshPolicy::DecideNext(result.m_eStatus, m_pimpl->m_iIntervalMs.load(), iBackoffMs);
             iBackoffMs = decision.m_iDelayMs;
             bAutoRetry = decision.m_bAutoRetry;
             eLastStatus = result.m_eStatus;
             bFirstFetch = false;
-            timerSinceFetch.restart();
+            timerSinceFetch.start();
         }
         // QNetworkAccessManager schedules deleteLater() on this thread, whose event loop DoWork blocks; flush them here.
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
