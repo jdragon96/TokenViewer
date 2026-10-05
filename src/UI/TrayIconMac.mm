@@ -49,22 +49,23 @@
 namespace
 {
 constexpr CGFloat kMinBackingScale = 2.0;
+constexpr size_t kBitsPerComponent = 8;
 NSString* const kAppearanceKeyPath = @"effectiveAppearance";
 
 NSImage* CreateNSImage(const QImage& image)
 {
     const QImage imgArgb = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-    CGContextRef context = CGBitmapContextCreate(const_cast<uchar*>(imgArgb.constBits()), imgArgb.width(), imgArgb.height(), 8,
-        imgArgb.bytesPerLine(), colorSpace, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host);
-    CGImageRef cgImage = CGBitmapContextCreateImage(context);
+    CGColorSpaceRef pColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    CGContextRef pContext = CGBitmapContextCreate(const_cast<uchar*>(imgArgb.constBits()), imgArgb.width(), imgArgb.height(), kBitsPerComponent,
+        imgArgb.bytesPerLine(), pColorSpace, kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host);
+    CGImageRef pCgImage = CGBitmapContextCreateImage(pContext);
     const qreal dDevicePixelRatio = image.devicePixelRatio();
-    NSImage* nsImage = [[NSImage alloc] initWithCGImage:cgImage
+    NSImage* pNsImage = [[NSImage alloc] initWithCGImage:pCgImage
                                                    size:NSMakeSize(image.width() / dDevicePixelRatio, image.height() / dDevicePixelRatio)];
-    CGImageRelease(cgImage);
-    CGContextRelease(context);
-    CGColorSpaceRelease(colorSpace);
-    return nsImage;
+    CGImageRelease(pCgImage);
+    CGContextRelease(pContext);
+    CGColorSpaceRelease(pColorSpace);
+    return pNsImage;
 }
 }
 
