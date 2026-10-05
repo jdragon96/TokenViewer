@@ -42,7 +42,7 @@ private:
 
 void TestPriceTable::init()
 {
-    QVERIFY(m_priceTable.LoadFromJson(ReadSourceFile(QStringLiteral("resources/prices.json"))));
+    QVERIFY(m_priceTable.LoadFromJson(ReadSourceFile(QStringLiteral("shared/prices.json"))));
 }
 
 void TestPriceTable::TestLoadsBundledPrices()

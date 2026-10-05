@@ -5,3 +5,6 @@ build-*/
 *.user
 compile_commands.json
 .cache
+macos/.build/
+macos/.swiftpm/
+macos/dist/

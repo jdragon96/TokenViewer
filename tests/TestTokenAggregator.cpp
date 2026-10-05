@@ -54,7 +54,7 @@ void TestTokenAggregator::initTestCase()
 {
     qputenv("TZ", "Asia/Seoul");
     tzset();
-    QVERIFY(m_priceTable.LoadFromJson(ReadSourceFile(QStringLiteral("resources/prices.json"))));
+    QVERIFY(m_priceTable.LoadFromJson(ReadSourceFile(QStringLiteral("shared/prices.json"))));
 }
 
 void TestTokenAggregator::TestGroupsByProjectAndSortsByCost()

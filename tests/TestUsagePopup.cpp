@@ -61,7 +61,7 @@ void TestUsagePopup::init()
     m_upSettings = std::make_unique<Settings>(m_upStoredSettings.get());
     m_upStatus = std::make_unique<SystemStatus>();
     m_upObservers = std::make_unique<Observers>();
-    QVERIFY(m_priceTable.LoadFromJson(ReadSourceFile(QStringLiteral("resources/prices.json"))));
+    QVERIFY(m_priceTable.LoadFromJson(ReadSourceFile(QStringLiteral("shared/prices.json"))));
 }
 
 void TestUsagePopup::cleanup()

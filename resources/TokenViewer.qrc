@@ -1,6 +1,6 @@
 <RCC>
     <qresource prefix="/">
-        <file>prices.json</file>
+        <file alias="prices.json">../shared/prices.json</file>
         <file>THIRD_PARTY_NOTICES.md</file>
     </qresource>
 </RCC>
