@@ -83,7 +83,7 @@ macOS 상단 메뉴바에서 **Claude Code 요금제 한도(Pro/Max)에 얼마�
 
 - `GET https://api.anthropic.com/api/oauth/usage`
 - 헤더: `Authorization: Bearer <accessToken>`, `anthropic-beta: oauth-2025-04-20`
-- 기대하는 응답(**미검증**, 첫 작업에서 실제 응답으로 확정):
+- 응답 형태 (2026-10-05 실제 응답으로 확인, `docs/superpowers/notes/2026-10-05-usage-api-probe.md`):
   `five_hour.utilization` (0–100), `five_hour.resets_at`, `seven_day.utilization`, `seven_day.resets_at`.
 - 파서는 관대하게 만든다: `%` 필드는 `utilization` 또는 `used_percentage`, `resets_at` 은 ISO 8601 문자열 또는 epoch 초 둘 다 받는다. 필드가 없거나 `null` 이면 그 미터만 비운다.
 - 공식 문서에 없는 API 라서 바뀔 수 있다. 바뀌면 "응답 형식이 바뀌었습니다" 상태가 되고 로그 목록은 계속 동작한다.
@@ -92,7 +92,7 @@ macOS 상단 메뉴바에서 **Claude Code 요금제 한도(Pro/Max)에 얼마�
 
 - 1순위: Keychain generic password, 서비스 이름 `Claude Code-credentials`. Security.framework C API (`SecItemCopyMatching`) 로 읽는다.
 - 2순위: `~/.claude/.credentials.json`.
-- 기대하는 내용(**미검증**): `claudeAiOauth.accessToken`, `expiresAt`, `subscriptionType`, `rateLimitTier`.
+- 내용 (2026-10-05 확인, `expiresAt` 은 epoch ms): `claudeAiOauth.accessToken`, `expiresAt`, `subscriptionType`, `rateLimitTier`.
 - `expiresAt` 이 지났으면 API 를 부르지 않고 "토큰 만료" 상태로 둔다.
 - **refreshToken 은 읽지도 쓰지도 않는다.** 앱이 토큰을 갱신하면 토큰 회전 때문에 Claude Code 로그인이 풀릴 수 있다.
 
