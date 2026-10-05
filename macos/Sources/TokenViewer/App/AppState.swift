@@ -12,6 +12,7 @@ final class AppState {
     private(set) var breakdown = Breakdown()
     /// False until the first log scan finishes, which takes several seconds on a large history.
     private(set) var isBreakdownLoaded = false
+    @ObservationIgnored private var breakdownRevision = 0
     /// Advanced by a clock so ages and staleness update without new data.
     private(set) var now = Date()
 
@@ -24,8 +25,13 @@ final class AppState {
         usage.apply(result, now: now)
     }
 
-    func apply(_ breakdown: Breakdown) {
-        self.breakdown = breakdown
+    /// Keeps the breakdown of the newest query; one grouped by an older tab or period can arrive late.
+    func apply(_ update: BreakdownUpdate) {
+        guard update.revision >= breakdownRevision else {
+            return
+        }
+        breakdown = update.breakdown
+        breakdownRevision = update.revision
         isBreakdownLoaded = true
     }
 

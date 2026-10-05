@@ -12,12 +12,23 @@ public struct BreakdownQuery: Sendable, Equatable {
     }
 }
 
+/// A breakdown and the revision of the query it was grouped by.
+public struct BreakdownUpdate: Sendable, Equatable {
+    public var breakdown: Breakdown
+    public var revision: Int
+
+    public init(breakdown: Breakdown, revision: Int) {
+        self.breakdown = breakdown
+        self.revision = revision
+    }
+}
+
 /// Scans `~/.claude/projects` off the main thread and publishes the breakdown for the current tab and period (spec 4.2).
 public actor LogScanner {
     private let root: URL
     private let prices: PriceTable?
     private let interval: TimeInterval
-    private let onUpdate: @Sendable (Breakdown) async -> Void
+    private let onUpdate: @Sendable (BreakdownUpdate) async -> Void
     private let store = LogStore()
     private let signal = WakeSignal()
     private var query: BreakdownQuery
@@ -25,7 +36,7 @@ public actor LogScanner {
     private var loop: Task<Void, Never>?
 
     public init(root: URL, prices: PriceTable?, interval: TimeInterval, query: BreakdownQuery,
-                onUpdate: @escaping @Sendable (Breakdown) async -> Void) {
+                onUpdate: @escaping @Sendable (BreakdownUpdate) async -> Void) {
         self.root = root
         self.prices = prices
         self.interval = interval
@@ -73,6 +84,7 @@ public actor LogScanner {
         let now = Date()
         let start = TokenAggregator.periodStart(query.period, now: now, fiveHourResetsAt: query.fiveHourResetsAt)
         let breakdown = TokenAggregator.aggregate(store.snapshot, prices: prices, dimension: query.dimension, from: start)
-        await onUpdate(breakdown)
+        // Updates from the loop and from setQuery can reach the sink in either order; the revision lets it keep the newest.
+        await onUpdate(BreakdownUpdate(breakdown: breakdown, revision: queryRevision))
     }
 }

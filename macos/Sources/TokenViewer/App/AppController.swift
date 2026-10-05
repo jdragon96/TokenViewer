@@ -37,7 +37,7 @@ final class AppController {
             prices: prices,
             interval: AppConstants.logScanInterval,
             query: state.breakdownQuery,
-            onUpdate: { [weak self] breakdown in await self?.receive(breakdown) })
+            onUpdate: { [weak self] update in await self?.receive(update) })
         self.fetcher = fetcher
         self.scanner = scanner
 
@@ -98,8 +98,8 @@ final class AppController {
         statusItem.update(state.iconState)
     }
 
-    private func receive(_ breakdown: Breakdown) {
-        state.apply(breakdown)
+    private func receive(_ update: BreakdownUpdate) {
+        state.apply(update)
     }
 
     private func pushQuery() {

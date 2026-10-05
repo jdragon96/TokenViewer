@@ -5,10 +5,28 @@ import Testing
 @Suite struct LogScannerTests {
     private let recent = TestSupport.isoString(Date().addingTimeInterval(-3600))
 
-    private func makeScanner(root: URL, updates: Recorder<Breakdown>) throws -> LogScanner {
+    private func makeScanner(root: URL, updates: Recorder<Breakdown>, revisions: Recorder<Int> = Recorder()) throws -> LogScanner {
         LogScanner(root: root, prices: try TestSupport.prices(), interval: 60,
                    query: BreakdownQuery(dimension: .project, period: .thirtyDays),
-                   onUpdate: { await updates.append($0) })
+                   onUpdate: { update in
+                       await revisions.append(update.revision)
+                       await updates.append(update.breakdown)
+                   })
+    }
+
+    @Test func updatesCarryTheirQueryRevision() async throws {
+        let dir = try TemporaryDirectory()
+        try dir.write("-w-app/s1.jsonl", [LogLines.assistant(id: "a", cwd: "/w/app", timestamp: recent)])
+        let updates = Recorder<Breakdown>()
+        let revisions = Recorder<Int>()
+        let scanner = try makeScanner(root: dir.url, updates: updates, revisions: revisions)
+        await scanner.start()
+        #expect(await waitUntil { await revisions.values == [0] })
+        await scanner.setQuery(BreakdownQuery(dimension: .model, period: .thirtyDays), revision: 3)
+        await scanner.requestRescan()
+        // The periodic publish after the new query carries the same revision, so a sink can drop older ones.
+        #expect(await waitUntil { await revisions.values == [0, 3, 3] })
+        await scanner.stop()
     }
 
     @Test func publishesOnStartAndRescan() async throws {
