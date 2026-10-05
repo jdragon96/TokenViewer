@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.21)
+project(TokenViewer VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui Widgets Network Test)
+
+# LGPLv3: Qt must stay a shared library (docs/LicenseCompliance.md).
+foreach(_module Core Gui Widgets Network)
+    get_target_property(_type Qt5::${_module} TYPE)
+    if(NOT _type STREQUAL "SHARED_LIBRARY")
+        message(FATAL_ERROR "Qt5::${_module} must be linked as a shared library (LGPLv3)")
+    endif()
+endforeach()
+
+set(TV_CORE_SOURCES
+    src/UI/TrayIconPainter.cpp
+)
+
+add_library(TokenViewerCore STATIC ${TV_CORE_SOURCES})
+target_include_directories(TokenViewerCore PUBLIC src)
+target_link_libraries(TokenViewerCore PUBLIC Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Network)
+target_compile_definitions(TokenViewerCore PUBLIC TV_VERSION="${PROJECT_VERSION}")
+
+enable_testing()
+add_subdirectory(tests)

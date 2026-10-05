@@ -1,0 +1,9 @@
+function(tv_add_test name)
+    add_executable(${name} ${name}.cpp)
+    target_link_libraries(${name} PRIVATE TokenViewerCore Qt5::Test)
+    target_compile_definitions(${name} PRIVATE TV_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endfunction()
+
+tv_add_test(TestTrayIconPainter)
