@@ -8,3 +8,4 @@ endfunction()
 
 tv_add_test(TestTrayIconPainter)
 tv_add_test(TestPriceTable)
+tv_add_test(TestLogParser)
