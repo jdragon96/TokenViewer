@@ -42,6 +42,8 @@ set(TV_CORE_SOURCES
     src/Core/Settings.cpp
     src/Core/SystemStatus.cpp
     src/Core/Observers.h
+    src/Core/Application.h
+    src/Core/Application.cpp
 )
 if(TV_NATIVE_TRAY)
     enable_language(OBJCXX)
@@ -60,7 +62,7 @@ if(TV_NATIVE_TRAY)
 endif()
 target_compile_definitions(TokenViewerCore PUBLIC TV_VERSION="${PROJECT_VERSION}")
 
-add_executable(TokenViewer MACOSX_BUNDLE src/main.cpp)
+add_executable(TokenViewer MACOSX_BUNDLE src/main.cpp resources/TokenViewer.qrc)
 set_target_properties(TokenViewer PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/resources/Info.plist.in
     MACOSX_BUNDLE_GUI_IDENTIFIER com.tokenviewer.TokenViewer
