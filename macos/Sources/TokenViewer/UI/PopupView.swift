@@ -95,11 +95,15 @@ struct PopupView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(footer.isFailure ? Palette.level(.critical, appearance).color : Color.secondary)
             Spacer()
+            // The symbols alone would reach VoiceOver as just "button".
             Button("↻") { controller.refreshNow() }
                 .help("새로고침")
+                .accessibilityLabel("새로고침")
             Button("⚙") { controller.openSettings() }
                 .help("설정")
+                .accessibilityLabel("설정")
             Button("종료") { controller.quit() }
+                .accessibilityLabel("종료")
         }
         .buttonStyle(.borderless)
     }
