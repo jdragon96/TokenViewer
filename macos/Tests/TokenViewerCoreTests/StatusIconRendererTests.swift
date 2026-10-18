@@ -19,22 +19,72 @@ import Testing
         }
     }
 
-    /// Reads the pixel at a point position (origin top-left) from the rendered icon.
-    private func pixel(_ icon: StatusIconImage, x: CGFloat, y: CGFloat, scale: CGFloat = 2) -> Pixel {
-        let image = icon.image
-        var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
-        bytes.withUnsafeMutableBytes { buffer in
-            let context = CGContext(data: buffer.baseAddress, width: image.width, height: image.height, bitsPerComponent: 8,
-                                    bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+    /// The icon's pixels as premultiplied RGBA, read at point positions with the origin at the top-left.
+    private struct Bitmap {
+        let icon: StatusIconImage
+        let scale: CGFloat
+        private let bytes: [UInt8]
+
+        init(_ icon: StatusIconImage, scale: CGFloat) {
+            self.icon = icon
+            self.scale = scale
+            let image = icon.image
+            var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
+            bytes.withUnsafeMutableBytes { buffer in
+                let context = CGContext(data: buffer.baseAddress, width: image.width, height: image.height, bitsPerComponent: 8,
+                                        bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+                context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            }
+            self.bytes = bytes
         }
-        let offset = (Int(y * scale) * image.width + Int(x * scale)) * 4
-        return Pixel(red: Int(bytes[offset]), green: Int(bytes[offset + 1]), blue: Int(bytes[offset + 2]), alpha: Int(bytes[offset + 3]))
+
+        func pixel(x: CGFloat, y: CGFloat) -> Pixel {
+            let offset = (Int(y * scale) * icon.image.width + Int(x * scale)) * 4
+            return Pixel(red: Int(bytes[offset]), green: Int(bytes[offset + 1]), blue: Int(bytes[offset + 2]), alpha: Int(bytes[offset + 3]))
+        }
+
+        /// True when an opaque pixel of `color` lies inside `rect` (points).
+        func contains(_ color: UInt32, in rect: CGRect) -> Bool {
+            var y = rect.minY
+            while y < rect.maxY {
+                var x = rect.minX
+                while x < rect.maxX {
+                    let candidate = pixel(x: x, y: y)
+                    if candidate.alpha > 200 && candidate.isClose(to: color, tolerance: 12) {
+                        return true
+                    }
+                    x += 1 / scale
+                }
+                y += 1 / scale
+            }
+            return false
+        }
     }
 
-    private func render(_ state: StatusIconState, _ appearance: MenuBarAppearance = .light, scale: CGFloat = 2) throws -> StatusIconImage {
-        try #require(StatusIconRenderer.render(state, appearance: appearance, scale: scale))
+    private func render(_ state: StatusIconState, _ appearance: MenuBarAppearance = .light, scale: CGFloat = 2) throws -> Bitmap {
+        Bitmap(try #require(StatusIconRenderer.render(state, appearance: appearance, scale: scale)), scale: scale)
+    }
+
+    /// Points on the border's stroke, named by where they sit on the box.
+    private struct Border {
+        let box: CGRect
+
+        init(_ bitmap: Bitmap) {
+            box = StatusIconRenderer.boxRect(width: bitmap.icon.size.width)
+        }
+
+        var leftBelowStart: CGPoint { CGPoint(x: box.minX, y: box.midY + 2) }
+        var bottomLeft: CGPoint { CGPoint(x: box.minX + 7, y: box.maxY) }
+        var bottomRight: CGPoint { CGPoint(x: box.maxX - 6, y: box.maxY) }
+        var rightMiddle: CGPoint { CGPoint(x: box.maxX, y: box.midY) }
+        var topMiddle: CGPoint { CGPoint(x: box.midX, y: box.minY) }
+        var leftAboveStart: CGPoint { CGPoint(x: box.minX, y: box.midY - 2) }
+        var interior: CGRect { box.insetBy(dx: 2.5, dy: 2.5) }
+    }
+
+    private func isFilled(_ bitmap: Bitmap, _ point: CGPoint) -> Bool {
+        bitmap.pixel(x: point.x, y: point.y).alpha > 200
     }
 
     @Test func classifiesLevels() {
@@ -51,51 +101,82 @@ import Testing
         #expect(StatusIconRenderer.isTemplate(StatusIconState()))
     }
 
-    @Test func formatsLabel() {
-        #expect(StatusIconRenderer.label(StatusIconState(fiveHourPercent: 41.6)) == "42%")
-        #expect(StatusIconRenderer.label(StatusIconState(fiveHourPercent: 120)) == "100%")
+    @Test func showsTheFiveHourNumberWithoutPercentSign() {
+        #expect(StatusIconRenderer.label(StatusIconState(fiveHourPercent: 41.6)) == "42")
+        #expect(StatusIconRenderer.label(StatusIconState(fiveHourPercent: 120)) == "100")
+        #expect(StatusIconRenderer.label(StatusIconState(fiveHourPercent: 0)) == "0")
         #expect(StatusIconRenderer.label(StatusIconState(sevenDayPercent: 50)) == "—")
     }
 
-    @Test func fillsFiveHourBarProportionally() throws {
-        let icon = try render(StatusIconState(fiveHourPercent: 50, sevenDayPercent: 0))
-        #expect(pixel(icon, x: 4, y: 6).alpha > 200)
-        #expect(pixel(icon, x: 15, y: 6).alpha < 40)
-        #expect(icon.isTemplate)
+    @Test func fillsTheBorderCounterclockwiseFromNineOClock() throws {
+        // A quarter of the way round: down the left side from the middle, round the corner, half the bottom.
+        let bitmap = try render(StatusIconState(fiveHourPercent: 10, sevenDayPercent: 25))
+        let border = Border(bitmap)
+        #expect(isFilled(bitmap, border.leftBelowStart))
+        #expect(isFilled(bitmap, border.bottomLeft))
+        #expect(!isFilled(bitmap, border.bottomRight))
+        #expect(!isFilled(bitmap, border.rightMiddle))
+        #expect(!isFilled(bitmap, border.topMiddle))
+        #expect(!isFilled(bitmap, border.leftAboveStart))
+        #expect(bitmap.icon.isTemplate)
     }
 
-    @Test func usesLevelColorWhenWarning() throws {
-        #expect(pixel(try render(StatusIconState(fiveHourPercent: 75), .light), x: 4, y: 6).isClose(to: 0xc98500))
-        #expect(pixel(try render(StatusIconState(fiveHourPercent: 75), .dark), x: 4, y: 6).isClose(to: 0xfab219))
-        #expect(pixel(try render(StatusIconState(fiveHourPercent: 95), .dark), x: 4, y: 6).isClose(to: 0xff6b6b))
+    @Test func aFullWeekClosesTheBorder() throws {
+        let bitmap = try render(StatusIconState(fiveHourPercent: 10, sevenDayPercent: 100), .dark)
+        let border = Border(bitmap)
+        for point in [border.leftBelowStart, border.bottomRight, border.rightMiddle, border.topMiddle, border.leftAboveStart] {
+            #expect(isFilled(bitmap, point))
+        }
     }
 
-    @Test func colorsSevenDayBarIndependently() throws {
-        let icon = try render(StatusIconState(fiveHourPercent: 10, sevenDayPercent: 95), .light)
-        #expect(pixel(icon, x: 4, y: 12).isClose(to: 0xd03b3b))
-        let fiveHour = pixel(icon, x: 1, y: 6)
-        #expect(fiveHour.isClose(to: 0x000000, tolerance: 30))
-        #expect(fiveHour.alpha > 200)
-        #expect(!icon.isTemplate)
+    @Test func anEmptyWeekLeavesOnlyAFaintTrack() throws {
+        let bitmap = try render(StatusIconState(fiveHourPercent: 10, sevenDayPercent: 0))
+        let track = bitmap.pixel(x: Border(bitmap).bottomLeft.x, y: Border(bitmap).bottomLeft.y)
+        #expect(track.alpha > 30 && track.alpha < 130)
+    }
+
+    @Test func colorsTheNumberByTheFiveHourLevel() throws {
+        let warning = try render(StatusIconState(fiveHourPercent: 75, sevenDayPercent: 10), .light)
+        #expect(warning.contains(0xc98500, in: Border(warning).interior))
+        let critical = try render(StatusIconState(fiveHourPercent: 95, sevenDayPercent: 10), .dark)
+        #expect(critical.contains(0xff6b6b, in: Border(critical).interior))
+        #expect(!critical.icon.isTemplate)
+    }
+
+    @Test func colorsTheBorderByTheWeeklyLevel() throws {
+        let bitmap = try render(StatusIconState(fiveHourPercent: 10, sevenDayPercent: 95), .light)
+        let border = Border(bitmap)
+        #expect(bitmap.pixel(x: border.bottomLeft.x, y: border.bottomLeft.y).isClose(to: 0xd03b3b, tolerance: 12))
+        // The five-hour number stays in the menu bar ink.
+        #expect(!bitmap.contains(0xd03b3b, in: border.interior))
+        #expect(!bitmap.icon.isTemplate)
     }
 
     @Test func dimsStaleState() throws {
-        let alpha = pixel(try render(StatusIconState(fiveHourPercent: 50, isStale: true)), x: 4, y: 6).alpha
+        let bitmap = try render(StatusIconState(fiveHourPercent: 10, sevenDayPercent: 50, isStale: true))
+        let alpha = bitmap.pixel(x: Border(bitmap).bottomLeft.x, y: Border(bitmap).bottomLeft.y).alpha
         #expect((118...137).contains(alpha))
     }
 
-    @Test func emptyStateHasNoFill() throws {
-        let icon = try render(StatusIconState())
-        #expect(pixel(icon, x: 4, y: 6).alpha < 40)
-        #expect(icon.isTemplate)
+    @Test func emptyStateShowsADashAndNoFill() throws {
+        let bitmap = try render(StatusIconState())
+        #expect(!isFilled(bitmap, Border(bitmap).bottomLeft))
+        #expect(bitmap.icon.isTemplate)
+    }
+
+    @Test func keepsOneWidthWhateverTheNumber() throws {
+        let widths = try [StatusIconState(fiveHourPercent: 0), StatusIconState(fiveHourPercent: 100), StatusIconState()].map {
+            try render($0).icon.size.width
+        }
+        #expect(Set(widths).count == 1)
     }
 
     @Test func scalesWithBackingFactor() throws {
-        let double = try render(StatusIconState(fiveHourPercent: 50), scale: 2)
+        let double = try render(StatusIconState(fiveHourPercent: 50), scale: 2).icon
         #expect(double.size.height == 18)
         #expect(double.image.height == 36)
         #expect(double.image.width == Int((double.size.width * 2).rounded()))
-        #expect(try render(StatusIconState(fiveHourPercent: 50), scale: 3).image.height == 54)
+        #expect(try render(StatusIconState(fiveHourPercent: 50), scale: 3).icon.image.height == 54)
     }
 
     @Test func buildsStateFromUsage() {
