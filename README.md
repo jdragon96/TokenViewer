@@ -1,169 +1,96 @@
 # TokenViewer
 
-Claude Code 요금제 한도(5시간·주간)를 메뉴바(macOS)·알림 영역(Windows)에 늘 보여 주는 앱입니다.
-클릭하면 리셋 시각과, 로컬 세션 로그로 계산한 프로젝트·모델·세션별 API 환산 비용을 보여 줍니다.
+Claude Code 요금제의 5시간·주간 한도를 Windows 알림 영역과 macOS 메뉴 막대에 늘 띄워 두는 앱입니다.
+아이콘을 누르면 리셋 시각과, 로컬 세션 로그로 계산한 프로젝트·모델·세션별 API 환산 비용이 나옵니다.
 
-| 플랫폼 | 상태 | 위치 |
-| --- | --- | --- |
-| macOS 14 이상 (Apple Silicon, Intel) | 사용 가능. Swift 네이티브 앱, 약 1.4MB | `macos/` |
-| Windows 10 (1903 이상) · 11, x64 | 사용 가능. Qt 5.15 앱, zip 약 12MB | `qt/` |
-| Ubuntu | 준비 중 (Qt) | `qt/` |
+## 아이콘 읽는 법
 
-## macOS
+아이콘 하나에 두 한도를 함께 보여 줍니다.
 
-### 설치
+- **가운데 숫자**: 5시간 한도 사용률(%).
+- **테두리**: 주간 한도 사용률. 9시 방향에서 시작해 아래쪽으로 돌며 차오르고, 한 바퀴를 다 채우면 주간 한도를 다 쓴 것입니다.
+- **색**: 숫자는 5시간 값, 테두리는 주간 값을 따라 따로 바뀝니다. 70% 이상이면 주황, 90% 이상이면 빨강이고 (설정에서 바꿀 수 있습니다), 그 아래는 작업 표시줄·메뉴 막대의 글자색 그대로입니다.
+- 값을 아직 못 받았으면 `—` 를, 갱신이 15분 넘게 실패하면 마지막 값을 흐리게 보여 줍니다.
 
-```bash
-curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/install.sh | bash
+### Windows
+
+<img src="docs/images/icon-states-windows.png" width="577" alt="Windows 작업 표시줄 아이콘: 5시간 0·70·100%와 주간 0·70·100%의 조합, 밝은·어두운 작업 표시줄">
+
+### macOS
+
+<img src="docs/images/icon-states-macos.png" width="577" alt="macOS 메뉴 막대 아이콘: 5시간 0·70·100%와 주간 0·70·100%의 조합, 밝은·어두운 메뉴 막대">
+
+드롭다운의 5시간·주간 막대도 같은 기준으로 파랑, 주황, 빨강으로 바뀝니다.
+
+## 개발 (빌드·실행)
+
+### Windows
+
+Qt 5.15.2 MinGW 64-bit, MinGW 8.1 (Qt 설치 프로그램의 Developer and Designer Tools), CMake 3.22 이상, Ninja 가 필요합니다.
+설치 프로그램까지 만들려면 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 도 필요합니다.
+
+```powershell
+$env:PATH = "C:\Qt\Tools\mingw810_64\bin;C:\Qt\5.15.2\mingw81_64\bin;$env:PATH"
+cmake -S qt -B build-win -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=C:/Qt/5.15.2/mingw81_64
+cmake --build build-win
+ctest --test-dir build-win --output-on-failure
+.\build-win\TokenViewer.exe              # 실행. 끌 때는 .\build-win\TokenViewer.exe --quit
 ```
 
-최신 릴리스를 내려받아 SHA-256 을 확인하고 `/Applications` (쓸 수 없으면 `~/Applications`) 에 설치한 뒤 실행합니다.
-sudo 는 쓰지 않습니다. 같은 명령으로 업데이트합니다.
+배포 파일 (Release 빌드, zip, 설치 프로그램이 `qt\dist` 에 생깁니다):
 
-Homebrew:
-
-```bash
-brew install --cask jdragon96/tap/tokenviewer
+```powershell
+powershell -ExecutionPolicy Bypass -File qt\scripts\package-windows.ps1
 ```
 
-업데이트는 `brew upgrade --cask tokenviewer`, 제거는 `brew uninstall --cask tokenviewer` (설정과 로그까지는 `--zap`).
-Homebrew 로 받은 앱도 DMG 처럼 처음 한 번 "그래도 열기"가 필요합니다 (아래 "처음 실행할 때").
+### macOS
 
-브라우저로 받기 (DMG):
-
-1. [최신 릴리스](https://github.com/jdragon96/TokenViewer/releases/latest)에서 `TokenViewer-macos.dmg` 를 받아 엽니다.
-2. TokenViewer 를 옆의 Applications 폴더로 끌어다 놓습니다.
-3. 응용 프로그램 폴더에서 TokenViewer 를 엽니다. 처음 한 번은 macOS 가 막습니다 (아래 "처음 실행할 때").
-
-소스에서 설치 (Xcode 16 이상 필요):
-
-```bash
-git clone https://github.com/jdragon96/TokenViewer.git
-TokenViewer/macos/scripts/install.sh --from-source
-```
-
-제거: 메뉴바 드롭다운에서 "종료"를 누른 뒤, 응용 프로그램 폴더의 TokenViewer 를 휴지통으로 끌어다 놓으면 됩니다.
-설정과 로그까지 지우려면 (앱, 로그인 항목, 설정, 로그):
-
-```bash
-curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/install.sh | bash -s -- --uninstall
-```
-
-### 처음 실행할 때
-
-- macOS 가 Keychain 의 `Claude Code-credentials` 접근을 묻습니다. "항상 허용"을 누르세요.
-- 릴리스 앱은 Apple Developer ID 가 아닌 ad-hoc 서명입니다. 그래서 **업데이트할 때마다 Keychain 허용 창이 한 번 더 뜹니다.**
-- curl 로 설치하면 Gatekeeper 경고 없이 실행됩니다. DMG 나 Homebrew 로 설치하면 처음 열 때 "Apple 이 악성 코드가 없음을 확인할 수 없습니다"가 뜹니다.
-  시스템 설정 → 개인정보 보호 및 보안 → 아래쪽의 **"그래도 열기"** 를 누르고 한 번 더 열면, 그 뒤로는 묻지 않습니다.
-  터미널에 익숙하다면 `xattr -dr com.apple.quarantine /Applications/TokenViewer.app` 로도 됩니다.
-- 로그인 시 자동 실행이 기본으로 켜져 있습니다. 설정(⚙)이나 시스템 설정 → 일반 → 로그인 항목에서 끌 수 있습니다.
-
-### 앱이 읽는 것과 보내는 곳
-
-- 읽기: Keychain `Claude Code-credentials` (없으면 `~/.claude/.credentials.json`) 의 accessToken·만료 시각·요금제. refreshToken 은 읽지 않습니다.
-- 읽기: `~/.claude/projects` 의 세션 로그 (토큰 수, 모델, 프로젝트 경로, 세션 제목).
-- 보내기: `https://api.anthropic.com/api/oauth/usage` 한 곳. 토큰은 이 요청에만 쓰고 저장하지 않습니다.
-- 쓰기: 설정(`~/Library/Preferences/com.tokenviewer.TokenViewer.plist`), API 응답 형식이 바뀌었을 때의 응답 본문(`~/Library/Logs/TokenViewer/`).
-
-사용량 API 는 공식 문서에 없는 API 라서 바뀔 수 있습니다. 바뀌면 드롭다운에 안내가 뜨고, 로그 기반 목록은 계속 동작합니다.
-
-### 개발
+Xcode 16 이상이 필요합니다.
 
 ```bash
 cd macos
-swift test                       # 단위 테스트
-scripts/build-app.sh --debug     # dist/TokenViewer.app (빠른 디버그 빌드)
-scripts/build-app.sh             # universal 릴리스 빌드 + zip + dmg + sha256
+swift test                                        # 단위 테스트
+scripts/build-app.sh --debug && open dist/TokenViewer.app   # 디버그 빌드 후 실행
+scripts/build-app.sh                              # universal 릴리스 빌드 + zip + dmg
 ```
 
-`TV_SIGN_IDENTITY="Developer ID Application: …"` 와 `TV_NOTARY_PROFILE=<notarytool 프로필>` 을 주면 서명·공증까지 합니다.
-`v*` 태그를 올리면 GitHub Actions 가 릴리스에 zip, dmg, sha256, install.sh 를 올립니다.
-릴리스가 올라간 뒤 `scripts/update-cask.sh <버전>` 으로 Homebrew cask ([jdragon96/homebrew-tap](https://github.com/jdragon96/homebrew-tap)) 를 갱신합니다.
+## 설치
 
-설계: `docs/superpowers/specs/2026-10-05-macos-swift-app-design.md`
+### Windows 10 (1903 이상) · 11, x64
 
-## Windows
-
-### 설치
-
-PowerShell 에서:
+[최신 릴리스](https://github.com/jdragon96/TokenViewer/releases/latest)에서 `TokenViewer-windows-setup.exe` 를 받아 실행합니다.
+관리자 권한 없이 사용자 폴더에 설치되고 시작 메뉴에 등록됩니다. PowerShell 한 줄로도 됩니다 (같은 명령으로 업데이트):
 
 ```powershell
 irm https://github.com/jdragon96/TokenViewer/releases/latest/download/install.ps1 | iex
 ```
 
-최신 릴리스의 zip 을 내려받아 SHA-256 을 확인하고 `%LOCALAPPDATA%\Programs\TokenViewer` 에 설치한 뒤, 시작 메뉴에 바로가기를 만들고 실행합니다.
-관리자 권한은 쓰지 않습니다. 같은 명령으로 업데이트합니다 (실행 중인 앱은 먼저 끕니다).
+설치 없이 쓰려면 `TokenViewer-windows.zip` 을 풀고 `TokenViewer.exe` 를 실행합니다.
+제거는 설정 → 앱 (설치된 앱, Windows 10 은 앱 및 기능) 에서 TokenViewer 를 고릅니다.
 
-브라우저로 받기 (zip):
+- Windows 11 은 새 트레이 아이콘을 작업 표시줄 오른쪽 `^` 안에 숨깁니다. 아이콘을 작업 표시줄로 끌어다 놓거나, 설정 → 개인 설정 → 작업 표시줄 → 기타 시스템 트레이 아이콘에서 켜세요.
+- 서명하지 않은 앱이라 브라우저로 받은 파일은 SmartScreen 이 처음 한 번 막습니다. "추가 정보" → "실행" 을 누르세요.
 
-1. [최신 릴리스](https://github.com/jdragon96/TokenViewer/releases/latest)에서 `TokenViewer-windows.zip` 을 받아 압축을 풉니다. 설치 프로그램은 없고, 풀린 `TokenViewer` 폴더째 원하는 곳(예: `%LOCALAPPDATA%\Programs`)에 두면 됩니다.
-2. 폴더 안의 `TokenViewer.exe` 를 실행합니다. 처음 한 번은 SmartScreen 이 막습니다 (아래 "처음 실행할 때").
+### macOS 14 이상
 
-소스에서 설치 (아래 "개발"의 Qt, MinGW, CMake, Ninja 필요):
-
-```powershell
-git clone https://github.com/jdragon96/TokenViewer.git
-powershell -ExecutionPolicy Bypass -File TokenViewer\qt\scripts\install.ps1 -FromSource
+```bash
+curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/install.sh | bash
 ```
 
-저장소의 `.ps1` 파일은 Windows 기본 실행 정책 때문에 `-ExecutionPolicy Bypass` 로 실행합니다 (`irm | iex` 는 상관없습니다).
-`-NoLaunch` 를 주면 설치만 하고 실행하지 않습니다. 환경 변수 `TV_INSTALL_DIR` 로 설치 위치를 바꿀 수 있습니다.
+Homebrew 는 `brew install --cask jdragon96/tap/tokenviewer`, 브라우저로는 릴리스의 `TokenViewer-macos.dmg` 를 열어 Applications 로 끌어다 놓습니다.
+제거 (설정과 로그 포함):
 
-제거 (앱, 시작 메뉴 바로가기, 로그인 시 자동 실행, 설정, 로그):
-
-```powershell
-& ([scriptblock]::Create((irm https://github.com/jdragon96/TokenViewer/releases/latest/download/install.ps1))) -Uninstall
+```bash
+curl -fsSL https://github.com/jdragon96/TokenViewer/releases/latest/download/install.sh | bash -s -- --uninstall
 ```
 
-zip 으로 쓰던 앱은 설정(⚙)에서 "로그인 시 자동 실행"을 끄고 드롭다운의 "종료"를 누른 뒤 폴더를 지우면 됩니다.
-그 뒤 위 제거 명령을 실행하면 남은 설정과 로그도 지웁니다.
+Homebrew 로 설치했다면 `brew uninstall --cask --zap tokenviewer` 로 지웁니다.
 
-### 처음 실행할 때
-
-- Windows 11 은 새 트레이 아이콘을 작업 표시줄 오른쪽 `^` (숨겨진 아이콘 표시) 안에 숨깁니다.
-  `^` 를 눌러 TokenViewer 아이콘을 작업 표시줄로 끌어다 놓거나, 설정 → 개인 설정 → 작업 표시줄 → 기타 시스템 트레이 아이콘에서 TokenViewer 를 켜세요.
-- 아이콘을 왼쪽이나 오른쪽 클릭하면 드롭다운이 열리고 닫힙니다. 아이콘이 숨어 있을 때는 시작 메뉴에서 TokenViewer 를 다시 실행해도 드롭다운이 열립니다.
-- 서명하지 않은 앱입니다. PowerShell 로 설치하면 SmartScreen 경고 없이 실행됩니다.
-  브라우저로 받은 zip 은 처음 실행할 때 "Windows의 PC 보호" 창이 뜹니다. **"추가 정보" → "실행"** 을 누르면 그 뒤로는 묻지 않습니다.
-- **스마트 앱 컨트롤**이 켜진 PC 에서는 평판 없는 서명 안 된 앱이 "실행" 선택지 없이 막힐 수 있습니다.
-  Authenticode 서명이 없어서 생기는 일이고, 스마트 앱 컨트롤 설정(Windows 보안 → 앱 및 브라우저 컨트롤)에서만 풀 수 있습니다.
-- 로그인 시 자동 실행이 기본으로 켜져 있습니다. 설정(⚙)에서 끌 수 있고, 작업 관리자의 "시작 앱"에도 보입니다.
-
-### 앱이 읽는 것과 보내는 곳
-
-- 읽기: `%USERPROFILE%\.claude\.credentials.json` (환경 변수 `CLAUDE_CONFIG_DIR` 가 있으면 그 폴더의 `.credentials.json`) 의 accessToken·만료 시각·요금제. refreshToken 은 읽지 않습니다.
-- 읽기: 같은 폴더의 `projects` 에 있는 세션 로그 (토큰 수, 모델, 프로젝트 경로, 세션 제목).
-- 보내기: `https://api.anthropic.com/api/oauth/usage` 한 곳. Windows 에 들어 있는 WinHTTP 로 보내며 시스템 프록시 설정을 따릅니다. 토큰은 이 요청에만 쓰고 저장하지 않습니다.
-- 쓰기: 설정(레지스트리 `HKCU\Software\TokenViewer`), 로그인 시 자동 실행(`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 의 값 `TokenViewer`),
-  한 번만 실행하기 위한 잠금 파일(`%LOCALAPPDATA%\TokenViewer\TokenViewer\`), API 응답 형식이 바뀌었을 때의 응답 본문(`%LOCALAPPDATA%\TokenViewer\TokenViewer\logs\`).
-
-### 개발
-
-Qt 5.15.2 MinGW 64비트 (`C:\Qt\5.15.2\mingw81_64`), MinGW 8.1 (`C:\Qt\Tools\mingw810_64`), CMake 3.22 이상, Ninja 가 필요합니다.
-Qt 온라인 설치 프로그램에서 Qt 5.15.2 → MinGW 8.1.0 64-bit 와 Developer and Designer Tools → MinGW 8.1.0 64-bit 를 고르면 이 위치에 설치됩니다.
-
-```powershell
-$env:PATH = "C:\Qt\Tools\mingw810_64\bin;C:\Qt\5.15.2\mingw81_64\bin;$env:PATH"
-cmake -S qt -B build-win -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=C:/Qt/5.15.2/mingw81_64
-cmake --build build-win                                 # 앱과 테스트, 앱 아이콘(.ico)을 빌드합니다
-ctest --test-dir build-win --output-on-failure          # 단위 테스트
-powershell -ExecutionPolicy Bypass -File qt\scripts\package-windows.ps1   # Release 빌드 + 테스트 + zip + sha256 (qt\dist)
-```
-
-`package-windows.ps1` 은 `-SkipTests` 로 테스트를 건너뛰고, `TV_VERSION` 이 없으면 최신 git 태그를 버전으로 씁니다.
-스마트 앱 컨트롤이 켜진 PC 에서는 새로 링크한 테스트 실행 파일이나 빌드 중에 도는 아이콘 도구(`MakeIcon.exe`)가 가끔 막힙니다. 그 파일을 지우고 다시 빌드하면 풀립니다.
-`v*` 태그를 올리면 GitHub Actions 가 릴리스에 `TokenViewer-windows.zip`, `.sha256`, `install.ps1` 을 올립니다.
-
-설계: `docs/superpowers/specs/2026-10-23-windows-qt-app-design.md`
-
-## Ubuntu (준비 중)
-
-Qt 코드(`qt/`)를 Ubuntu 에서도 쓸 계획이지만 아직 빌드·확인하지 않았습니다.
-
-설계: `docs/superpowers/specs/2026-10-05-token-viewer-design.md`
+- 처음 실행하면 Keychain 의 `Claude Code-credentials` 접근을 묻습니다. "항상 허용"을 누르세요 (업데이트할 때마다 한 번 더 묻습니다).
+- DMG·Homebrew 로 설치하면 처음 한 번 시스템 설정 → 개인정보 보호 및 보안 → "그래도 열기" 가 필요합니다.
 
 ## 라이선스
 
-MIT. Windows 앱은 Qt (LGPLv3) 를 DLL 로 동적 링크하고 MinGW-w64 런타임 DLL 을 함께 넣습니다.
-고지는 `qt/resources/THIRD_PARTY_NOTICES.md` (앱의 설정 → "오픈소스 라이선스", 설치 폴더의 `THIRD_PARTY_NOTICES.md`), 라이선스 전문은 설치 폴더의 `licenses\` 에 있습니다.
+[MIT](LICENSE).
+Windows 앱은 Qt 5.15 (LGPLv3) 를 DLL 로 동적 링크하고 MinGW-w64 런타임 DLL 을 함께 넣으며, 설치 프로그램은 Inno Setup 으로 만듭니다.
+고지는 [`qt/resources/THIRD_PARTY_NOTICES.md`](qt/resources/THIRD_PARTY_NOTICES.md) (앱의 설정 → "오픈소스 라이선스") 에, 라이선스 전문은 설치 폴더의 `licenses\` 에 있습니다.
