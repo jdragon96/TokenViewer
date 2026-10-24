@@ -1,0 +1,90 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    # Path filters are not evaluated for tag pushes, so every v* tag builds a release.
+    tags: ['v*']
+    paths:
+      - 'qt/**'
+      - 'shared/**'
+      - '.github/workflows/windows.yml'
+  pull_request:
+    paths:
+      - 'qt/**'
+      - 'shared/**'
+      - '.github/workflows/windows.yml'
+
+jobs:
+  test:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt 5.15.2 and MinGW 8.1
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          host: windows
+          target: desktop
+          arch: win64_mingw81
+          tools: 'tools_mingw,qt.tools.win64_mingw810'
+          cache: true
+      - name: Put MinGW 8.1 and Ninja on PATH
+        # The runner has other MinGW builds on PATH; Qt 5.15.2 needs the 8.1 it was built with.
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "$env:IQTA_TOOLS\mingw810_64\bin"
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { choco install ninja --no-progress -y }
+      - name: Configure
+        run: |
+          $mingw = "$env:IQTA_TOOLS/mingw810_64".Replace('\', '/')
+          cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_PREFIX_PATH=$($env:QT_ROOT_DIR.Replace('\', '/'))" "-DCMAKE_CXX_COMPILER=$mingw/bin/g++.exe" "-DCMAKE_RC_COMPILER=$mingw/bin/windres.exe"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt 5.15.2 and MinGW 8.1
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          host: windows
+          target: desktop
+          arch: win64_mingw81
+          tools: 'tools_mingw,qt.tools.win64_mingw810'
+          cache: true
+      - name: Put Ninja on PATH
+        run: if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { choco install ninja --no-progress -y }
+      - name: Build, test and package
+        # Windows PowerShell 5.1, which users run the scripts with.
+        shell: powershell
+        env:
+          TV_VERSION: ${{ github.ref_name }}
+        run: ./qt/scripts/package-windows.ps1
+      - name: Prepare install script
+        shell: powershell
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          $pattern = '^(\s*)\$ReleaseRepo = '''''
+          $lines = [IO.File]::ReadAllLines((Join-Path (Get-Location) 'qt/scripts/install.ps1'))
+          $hits = @($lines | Where-Object { $_ -match $pattern }).Count
+          if ($hits -ne 1) { throw "expected one `$ReleaseRepo line in install.ps1, found $hits" }
+          $lines = $lines | ForEach-Object { if ($_ -match $pattern) { $Matches[1] + "`$ReleaseRepo = '$env:REPO'" } else { $_ } }
+          # No BOM: irm hands the file to iex as text, and a BOM there would be stray characters before the first command.
+          [IO.File]::WriteAllLines((Join-Path (Get-Location) 'qt/dist/install.ps1'), [string[]]$lines, (New-Object Text.UTF8Encoding($false)))
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # The macOS workflow creates the same release; if it wins the race, create fails and the release is reused.
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes || gh release view "$GITHUB_REF_NAME" >/dev/null
+          gh release upload "$GITHUB_REF_NAME" qt/dist/TokenViewer-windows.zip qt/dist/TokenViewer-windows.zip.sha256 qt/dist/install.ps1 --clobber
