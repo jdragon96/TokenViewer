@@ -42,6 +42,14 @@ jobs:
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Make sure Inno Setup 6 is installed
+        # The windows-2022 image ships Inno Setup 6.7.1; install that version only if the image ever drops it.
+        run: if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup --version=6.7.1 --no-progress -y }
+      - name: Package
+        # Builds the zip and the installer on every push and PR, so a packaging problem shows up before a tag
+        # rather than in the release job. The tests ran above; nothing built here is published.
+        shell: powershell
+        run: ./qt/scripts/package-windows.ps1 -SkipTests
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -62,6 +70,9 @@ jobs:
           cache: true
       - name: Put Ninja on PATH
         run: if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { choco install ninja --no-progress -y }
+      - name: Make sure Inno Setup 6 is installed
+        # The windows-2022 image ships Inno Setup 6.7.1; install that version only if the image ever drops it.
+        run: if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup --version=6.7.1 --no-progress -y }
       - name: Build, test and package
         # Windows PowerShell 5.1, which users run the scripts with.
         shell: powershell
@@ -87,4 +98,5 @@ jobs:
         # The macOS workflow creates the same release; if it wins the race, create fails and the release is reused.
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes || gh release view "$GITHUB_REF_NAME" >/dev/null
-          gh release upload "$GITHUB_REF_NAME" qt/dist/TokenViewer-windows.zip qt/dist/TokenViewer-windows.zip.sha256 qt/dist/install.ps1 --clobber
+          gh release upload "$GITHUB_REF_NAME" qt/dist/TokenViewer-windows.zip qt/dist/TokenViewer-windows.zip.sha256 \
+            qt/dist/TokenViewer-windows-setup.exe qt/dist/TokenViewer-windows-setup.exe.sha256 qt/dist/install.ps1 --clobber

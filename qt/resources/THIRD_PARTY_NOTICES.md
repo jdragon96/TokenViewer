@@ -38,3 +38,11 @@ TokenViewer 는 MinGW-w64 GCC 8.1.0 (MinGW-W64-builds 4.3.5, x86_64-posix-seh) �
   - 소스: https://sourceforge.net/projects/mingw-w64/
 
 HTTPS 는 Windows 에 들어 있는 WinHTTP 로 하므로 OpenSSL 은 넣지 않습니다.
+
+## 설치 프로그램 (Inno Setup)
+
+설치 프로그램 `TokenViewer-windows-setup.exe` 와 설치 폴더의 제거 프로그램 `unins000.exe` 는 Inno Setup 6 으로 만들었습니다.
+
+- 라이선스: Inno Setup License (https://jrsoftware.org/files/is/license.txt)
+- 저작권: Copyright (C) 1997-2026 Jordan Russell. Portions Copyright (C) 2000-2026 Martijn Laan. All rights reserved.
+- 소스: https://github.com/jrsoftware/issrc

@@ -1,13 +1,19 @@
-﻿# Builds the Windows release into qt\dist (spec 5.2): Release build, tests, windeployqt, notices, zip, SHA-256.
-#   .\package-windows.ps1              build, test and package
-#   .\package-windows.ps1 -SkipTests   package without running ctest
+﻿# Builds the Windows release into qt\dist (spec 5.2): Release build, tests, windeployqt, notices, zip,
+# the Inno Setup installer, SHA-256s.
+#   .\package-windows.ps1                  build, test and package
+#   .\package-windows.ps1 -SkipTests       package without running ctest
+#   .\package-windows.ps1 -SkipInstaller   zip only, without the installer (no Inno Setup needed)
 #   .\package-windows.ps1 -QtDir C:\Qt\5.15.2\mingw81_64 -MinGWDir C:\Qt\Tools\mingw810_64
+#   .\package-windows.ps1 -IsccPath 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 # Environment: TV_VERSION (default: the latest git tag without its v, then the CMake project version),
-#              QT_ROOT_DIR or Qt5_DIR (set by jurplel/install-qt-action) when -QtDir is not given.
+#              QT_ROOT_DIR or Qt5_DIR (set by jurplel/install-qt-action) when -QtDir is not given,
+#              TV_ISCC (path of Inno Setup 6's ISCC.exe) when -IsccPath is not given.
 param(
     [switch]$SkipTests,
+    [switch]$SkipInstaller,
     [string]$QtDir = '',
-    [string]$MinGWDir = ''
+    [string]$MinGWDir = '',
+    [string]$IsccPath = ''
 )
 
 Set-StrictMode -Version 2.0
@@ -22,6 +28,10 @@ $AppDir = Join-Path $DistDir 'TokenViewer'
 $ZipName = 'TokenViewer-windows.zip'
 $ZipPath = Join-Path $DistDir $ZipName
 $ShaPath = "$ZipPath.sha256"
+$SetupName = 'TokenViewer-windows-setup.exe'
+$SetupPath = Join-Path $DistDir $SetupName
+$SetupShaPath = "$SetupPath.sha256"
+$SetupScript = Join-Path $QtProjectDir 'installer\TokenViewer.iss'
 # Everything else windeployqt adds is dropped: the app draws its own icons (no image or icon plugins),
 # forces the built-in Fusion style (no styles plugin) and does HTTPS through WinHTTP (no bearer plugin).
 $KeptQtFiles = @('Qt5Core.dll', 'Qt5Gui.dll', 'Qt5Widgets.dll', 'Qt5Network.dll', 'platforms\qwindows.dll')
@@ -98,6 +108,34 @@ function Resolve-MinGWDir([string]$Qt) {
         }
     }
     throw 'MinGW 8.1 (mingw810_64) 를 찾지 못했습니다. -MinGWDir <MinGW 폴더> 를 주세요.'
+}
+
+# Inno Setup 6's compiler. The official installer puts it under Program Files, or under
+# %LOCALAPPDATA%\Programs when installed for the current user; the windows-2022 runner image has it preinstalled.
+function Resolve-Iscc {
+    $explicit = if ($IsccPath) { $IsccPath } else { $env:TV_ISCC }
+    if ($explicit) {
+        if (-not (Test-Path -LiteralPath $explicit -PathType Leaf)) {
+            throw "ISCC.exe 가 없습니다: $explicit"
+        }
+        return (Resolve-Path -LiteralPath $explicit).Path
+    }
+    $candidates = @()
+    $onPath = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+    if ($onPath) {
+        $candidates += $onPath.Source
+    }
+    $candidates += Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'
+    if (${env:ProgramFiles(x86)}) {
+        $candidates += Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+    }
+    $candidates += Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+    throw 'Inno Setup 6 (ISCC.exe) 를 찾지 못했습니다. https://jrsoftware.org/isdl.php 에서 설치하거나 -IsccPath <ISCC.exe> 또는 TV_ISCC 를 주세요. 설치 프로그램 없이 만들려면 -SkipInstaller 를 쓰세요.'
 }
 
 function Get-AppVersion {
@@ -217,6 +255,13 @@ function New-ZipFromFolder([string]$SourceDir, [string]$Destination) {
     }
 }
 
+# Same format as shasum -a 256 (the macOS .sha256): hash, two spaces, file name, LF.
+function Write-Sha256File([string]$Path) {
+    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+    [IO.File]::WriteAllText("$Path.sha256", "$hash  $(Split-Path -Leaf $Path)`n", (New-Object Text.UTF8Encoding($false)))
+    return $hash
+}
+
 function Format-Kilobytes([long]$Bytes) {
     return ('{0:N0} KB' -f [math]::Ceiling($Bytes / 1KB))
 }
@@ -228,6 +273,8 @@ foreach ($tool in @('cmake', 'ninja')) {
         throw "$tool 이 PATH 에 없습니다."
     }
 }
+# Before the build, so a missing Inno Setup fails in seconds rather than after it.
+$iscc = if ($SkipInstaller) { '' } else { Resolve-Iscc }
 $version = Get-AppVersion
 $objdump = Join-Path $mingw 'bin\objdump.exe'
 $originalPath = $env:PATH
@@ -254,7 +301,7 @@ try {
     }
 
     Write-Step "배포 폴더: $AppDir"
-    foreach ($path in @($AppDir, $ZipPath, $ShaPath)) {
+    foreach ($path in @($AppDir, $ZipPath, $ShaPath, $SetupPath, $SetupShaPath)) {
         if (Test-Path -LiteralPath $path) {
             Remove-Item -LiteralPath $path -Recurse -Force
         }
@@ -275,18 +322,35 @@ try {
 
     Write-Step "압축: $ZipPath"
     New-ZipFromFolder $AppDir $ZipPath
-    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ZipPath).Hash.ToLowerInvariant()
-    # Same format as shasum -a 256 (the macOS .sha256): hash, two spaces, file name, LF.
-    [IO.File]::WriteAllText($ShaPath, "$hash  $ZipName`n", (New-Object Text.UTF8Encoding($false)))
+    $hash = Write-Sha256File $ZipPath
+
+    # The version the app shows (the exe's version info), so the setup and Apps & features say the same.
+    $shownVersion = (Get-Item -LiteralPath (Join-Path $AppDir 'TokenViewer.exe')).VersionInfo.ProductVersion
+    if (-not $SkipInstaller) {
+        if (-not $shownVersion) {
+            throw 'TokenViewer.exe 에 버전 정보가 없습니다.'
+        }
+        Write-Step "설치 프로그램: $SetupPath ($iscc)"
+        Invoke-Native $iscc @(
+            "/DAppVersion=$shownVersion", "/DSourceDir=$AppDir", "/DIconFile=$(Join-Path $BuildDir 'TokenViewer.ico')",
+            "/O$DistDir", $SetupScript)
+        if (-not (Test-Path -LiteralPath $SetupPath)) {
+            throw "ISCC 가 $SetupName 을 만들지 않았습니다."
+        }
+        $setupHash = Write-Sha256File $SetupPath
+    }
 
     $files = Get-ChildItem -LiteralPath $AppDir -Recurse -File | Sort-Object FullName
     foreach ($file in $files) {
         Write-Host ('    {0,10}  {1}' -f (Format-Kilobytes $file.Length), $file.FullName.Substring($AppDir.Length + 1))
     }
     $folderBytes = ($files | Measure-Object -Property Length -Sum).Sum
-    $shownVersion = (Get-Item -LiteralPath (Join-Path $AppDir 'TokenViewer.exe')).VersionInfo.ProductVersion
     Write-Host "TokenViewer $shownVersion : 폴더 $(Format-Kilobytes $folderBytes), $ZipName $(Format-Kilobytes (Get-Item -LiteralPath $ZipPath).Length)"
     Write-Host "SHA-256: $hash"
+    if (-not $SkipInstaller) {
+        Write-Host "$SetupName $(Format-Kilobytes (Get-Item -LiteralPath $SetupPath).Length)"
+        Write-Host "SHA-256: $setupHash"
+    }
 }
 finally {
     $env:PATH = $originalPath

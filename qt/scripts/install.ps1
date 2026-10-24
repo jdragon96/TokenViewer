@@ -4,8 +4,10 @@
 #   .\install.ps1 -FromSource     build this checkout (package-windows.ps1) and install it
 #   .\install.ps1 -Uninstall      remove the app, its Start Menu shortcut, login item, settings and logs
 #   -NoLaunch                     do not start the app after installing
+# Installing runs the release's installer (TokenViewer-windows-setup.exe) silently, so this route and the
+# installer leave the same install: an Apps & features entry with its uninstaller.
 # Environment: TV_REPO=owner/name, TV_RELEASE_BASE=<url> (default: the latest GitHub release),
-#              TV_INSTALL_DIR (default: %LOCALAPPDATA%\Programs\TokenViewer).
+#              TV_INSTALL_DIR (default: where it is already installed, else %LOCALAPPDATA%\Programs\TokenViewer).
 # Keep code outside string literals and comments ASCII: `irm` hands this file over decoded as Latin-1.
 param(
     [switch]$FromSource,
@@ -23,17 +25,21 @@ try {
         # The release workflow rewrites this line with the GitHub repository (owner/name).
         $ReleaseRepo = ''
 
-        $AssetName = 'TokenViewer-windows.zip'
+        $AssetName = 'TokenViewer-windows-setup.exe'
         $ExeName = 'TokenViewer.exe'
+        # Written by the installer for its AppId (qt\installer\TokenViewer.iss).
+        $UninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{CFD0D0E6-2DEE-4F55-95EB-05DE69CA8A73}_is1'
         $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
         $RunValueName = 'TokenViewer'
         $SettingsKey = 'HKCU:\Software\TokenViewer'
         $DataDir = Join-Path $env:LOCALAPPDATA 'TokenViewer'
         $ShortcutPath = Join-Path ([Environment]::GetFolderPath('Programs')) 'TokenViewer.lnk'
-        $InstallDir = if ($env:TV_INSTALL_DIR) { $env:TV_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\TokenViewer' }
-        $InstallDir = [IO.Path]::GetFullPath($InstallDir)
-        $InstalledExe = Join-Path $InstallDir $ExeName
+        $DefaultInstallDir = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\TokenViewer'))
+        $InstallDir = if ($env:TV_INSTALL_DIR) { [IO.Path]::GetFullPath($env:TV_INSTALL_DIR) } else { $DefaultInstallDir }
+        $SetupLog = Join-Path ([IO.Path]::GetTempPath()) 'TokenViewer-setup.log'
+        $SilentSwitches = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART')
         $QuitTimeoutSeconds = 5
+        $UninstallTimeoutSeconds = 30
 
         # GitHub serves release assets as application/octet-stream, which `irm` decodes as Latin-1: the UTF-8
         # Korean below then arrives as one character per byte, all at or below U+00FF. Turn those back into
@@ -79,11 +85,20 @@ try {
             return ''
         }
 
-        function Get-RunningApp {
+        # The folder the installer recorded, or '' when it has not installed the app.
+        function Get-InstalledAppDir {
+            $entry = Get-ItemProperty -LiteralPath $UninstallKey -ErrorAction SilentlyContinue
+            if ($entry -and $entry.PSObject.Properties['Inno Setup: App Path']) {
+                return "$($entry.'Inno Setup: App Path')"
+            }
+            return ''
+        }
+
+        function Get-RunningApp([string]$Exe) {
             $running = @()
             foreach ($process in @(Get-Process -Name 'TokenViewer' -ErrorAction SilentlyContinue)) {
                 try {
-                    if ($process.Path -and ([IO.Path]::GetFullPath($process.Path) -ieq $InstalledExe)) {
+                    if ($process.Path -and ([IO.Path]::GetFullPath($process.Path) -ieq $Exe)) {
                         $running += $process
                     }
                 }
@@ -95,14 +110,14 @@ try {
         }
 
         # The app's own --quit closes it like its quit button; one that does not exit in time is ended.
-        function Stop-App {
-            $running = Get-RunningApp
+        function Stop-App([string]$Exe) {
+            $running = Get-RunningApp $Exe
             if ($running.Count -eq 0) {
                 return
             }
             Write-Step '실행 중인 TokenViewer 를 끝냅니다.'
             try {
-                $quitter = Start-Process -FilePath $InstalledExe -ArgumentList '--quit' -WindowStyle Hidden -PassThru
+                $quitter = Start-Process -FilePath $Exe -ArgumentList '--quit' -WindowStyle Hidden -PassThru
                 $quitter.WaitForExit($QuitTimeoutSeconds * 1000) | Out-Null
             }
             catch {
@@ -118,71 +133,54 @@ try {
             }
         }
 
-        # TV_INSTALL_DIR may point anywhere: only an empty folder or one holding TokenViewer.exe is replaced or removed.
-        function Test-InstallDirIsOurs {
-            if (-not (Test-Path -LiteralPath $InstallDir)) {
+        # The folders this script installs into and may remove as a whole: the default one and TV_INSTALL_DIR.
+        function Test-ManagedDir([string]$Dir) {
+            $full = [IO.Path]::GetFullPath($Dir).TrimEnd('\')
+            return ($full -ieq $DefaultInstallDir.TrimEnd('\')) -or ($full -ieq $InstallDir.TrimEnd('\'))
+        }
+
+        # Guards a folder this script installs into or removes (the default one or TV_INSTALL_DIR, which may point
+        # anywhere): it must be empty or hold TokenViewer.exe.
+        function Test-InstallDirIsOurs([string]$Dir) {
+            if (-not (Test-Path -LiteralPath $Dir)) {
                 return $true
             }
-            return (Test-Path -LiteralPath $InstalledExe) -or -not (Get-ChildItem -LiteralPath $InstallDir -Force | Select-Object -First 1)
+            return (Test-Path -LiteralPath (Join-Path $Dir $ExeName)) -or -not (Get-ChildItem -LiteralPath $Dir -Force | Select-Object -First 1)
         }
 
-        function New-StartMenuShortcut {
-            New-Item -ItemType Directory -Path (Split-Path -Parent $ShortcutPath) -Force | Out-Null
-            $shell = New-Object -ComObject WScript.Shell
-            try {
-                $link = $shell.CreateShortcut($ShortcutPath)
-                $link.TargetPath = $InstalledExe
-                $link.WorkingDirectory = $InstallDir
-                $link.IconLocation = "$InstalledExe,0"
-                $link.Description = Repair-Text 'Claude 사용량'
-                $link.Save()
-            }
-            finally {
-                [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell)
-            }
-        }
-
-        # Swaps the folder in: the old copy is renamed first, so a file still in use aborts before anything is lost.
-        function Install-Folder([string]$Source) {
-            if (-not (Test-Path -LiteralPath (Join-Path $Source $ExeName))) {
-                Stop-Install '설치할 폴더에 {0} 이 없습니다: {1}' @($ExeName, $Source)
-            }
-            if (-not (Test-InstallDirIsOurs)) {
+        # The installer closes a copy running from its folder, replaces the files and creates the Start Menu
+        # shortcut and the Apps & features entry. An update stays in its folder unless TV_INSTALL_DIR is set.
+        function Install-Setup([string]$SetupPath) {
+            if (($env:TV_INSTALL_DIR -or -not (Get-InstalledAppDir)) -and -not (Test-InstallDirIsOurs $InstallDir)) {
                 Stop-Install '설치 폴더에 TokenViewer 가 아닌 파일이 있어 덮어쓰지 않습니다: {0}' @($InstallDir)
             }
-            Stop-App
-            $backup = "$InstallDir.old"
-            if (Test-Path -LiteralPath $backup) {
-                Remove-Item -LiteralPath $backup -Recurse -Force
+            $arguments = $SilentSwitches + @('/CURRENTUSER', ('/LOG="{0}"' -f $SetupLog))
+            if ($env:TV_INSTALL_DIR) {
+                $arguments += '/DIR="{0}"' -f $InstallDir
             }
-            $hadOld = Test-Path -LiteralPath $InstallDir
-            if ($hadOld) {
-                Rename-Item -LiteralPath $InstallDir -NewName (Split-Path -Leaf $backup)
-            }
+            Write-Step '설치 프로그램을 실행합니다.'
             try {
-                New-Item -ItemType Directory -Path (Split-Path -Parent $InstallDir) -Force | Out-Null
-                Copy-Item -LiteralPath $Source -Destination $InstallDir -Recurse
+                $process = Start-Process -FilePath $SetupPath -ArgumentList $arguments -Wait -PassThru
             }
             catch {
-                if (Test-Path -LiteralPath $InstallDir) {
-                    Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
-                }
-                if ($hadOld) {
-                    Rename-Item -LiteralPath $backup -NewName (Split-Path -Leaf $InstallDir)
-                }
-                throw
+                # e.g. Smart App Control refusing an unsigned program.
+                Stop-Install '설치 프로그램을 실행하지 못했습니다: {0}' @($_.Exception.Message)
             }
-            if ($hadOld) {
-                Remove-Item -LiteralPath $backup -Recurse -Force
+            if ($process.ExitCode -ne 0) {
+                Stop-Install '설치 프로그램이 실패했습니다 (종료 코드 {0}). 기록: {1}' @($process.ExitCode, $SetupLog)
             }
-            Write-Step '설치했습니다: {0}' @($InstallDir)
-            New-StartMenuShortcut
+            Remove-Item -LiteralPath $SetupLog -ErrorAction SilentlyContinue
+            $appDir = Get-InstalledAppDir
+            if (-not $appDir) {
+                Stop-Install '설치 프로그램이 끝났지만 설치 정보가 없습니다.'
+            }
+            Write-Step '설치했습니다: {0}' @($appDir)
             Write-Step '시작 메뉴 바로가기: {0}' @($ShortcutPath)
             if ($NoLaunch) {
                 Write-Step '실행하지 않았습니다 (-NoLaunch). 시작 메뉴에서 TokenViewer 를 여세요.'
             }
             else {
-                Start-Process -FilePath $InstalledExe -WorkingDirectory $InstallDir
+                Start-Process -FilePath (Join-Path $appDir $ExeName) -WorkingDirectory $appDir
                 Write-Step 'TokenViewer 를 실행했습니다.'
             }
             Write-Host (Repair-Text '    Windows 11 은 새 트레이 아이콘을 작업 표시줄 오른쪽 ^ 안에 숨깁니다.')
@@ -222,19 +220,16 @@ try {
             $work = Join-Path ([IO.Path]::GetTempPath()) ('TokenViewer-install-' + [Guid]::NewGuid().ToString('N'))
             New-Item -ItemType Directory -Path $work | Out-Null
             try {
-                $zipPath = Join-Path $work $AssetName
+                $setupPath = Join-Path $work $AssetName
                 Write-Step '내려받는 중: {0}' @("$base/$AssetName")
-                Save-Url "$base/$AssetName" $zipPath
-                Save-Url "$base/$AssetName.sha256" "$zipPath.sha256"
-                $expected = ([IO.File]::ReadAllText("$zipPath.sha256").Trim() -split '\s+')[0].ToLowerInvariant()
-                $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash.ToLowerInvariant()
+                Save-Url "$base/$AssetName" $setupPath
+                Save-Url "$base/$AssetName.sha256" "$setupPath.sha256"
+                $expected = ([IO.File]::ReadAllText("$setupPath.sha256").Trim() -split '\s+')[0].ToLowerInvariant()
+                $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $setupPath).Hash.ToLowerInvariant()
                 if ($expected -notmatch '^[0-9a-f]{64}$' -or $expected -ne $actual) {
                     Stop-Install 'SHA-256 이 맞지 않습니다. 설치하지 않았습니다.'
                 }
-                Add-Type -AssemblyName System.IO.Compression.FileSystem
-                $unzipped = Join-Path $work 'unzipped'
-                [IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $unzipped)
-                Install-Folder (Join-Path $unzipped 'TokenViewer')
+                Install-Setup $setupPath
             }
             finally {
                 Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
@@ -247,22 +242,89 @@ try {
                 Stop-Install '-FromSource 는 저장소 안의 install.ps1 로 실행하세요.'
             }
             & $packager -SkipTests
-            Install-Folder ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\dist\TokenViewer')))
+            Install-Setup ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\dist\$AssetName")))
+        }
+
+        # The installer's own uninstaller closes the app and removes its files, shortcut and Apps & features entry.
+        function Uninstall-Setup {
+            $entry = Get-ItemProperty -LiteralPath $UninstallKey
+            $appDir = Get-InstalledAppDir
+            $command = if ($entry.PSObject.Properties['UninstallString']) { "$($entry.UninstallString)" } else { '' }
+            $uninstaller = if ($command -match '^\s*"([^"]+)"') { $Matches[1] } else { $command.Trim() }
+            if (-not $uninstaller -or -not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
+                # The uninstaller was deleted by hand, and with it the list of files it installed. Only a folder this
+                # script manages is removed as a whole (before the entry, so a refused folder keeps its entry);
+                # any other folder the installer was pointed at may be shared with other programs and is left alone.
+                $dir = if ($appDir) { $appDir } else { $InstallDir }
+                $leaveDir = (Test-Path -LiteralPath $dir) -and -not (Test-ManagedDir $dir)
+                if (-not $leaveDir) {
+                    Write-Step '제거 프로그램이 없어 직접 지웁니다: {0}' @($dir)
+                    Uninstall-Folder $dir | Out-Null
+                }
+                Remove-Item -LiteralPath $UninstallKey -Recurse -Force
+                Write-Step '설치 정보를 지웠습니다.'
+                if ($leaveDir) {
+                    Write-Step '제거 프로그램이 없어 이 폴더는 지우지 않았습니다. 다른 파일이 함께 있을 수 있으니 확인하고 직접 지우세요: {0}' @($dir)
+                }
+                return
+            }
+            Write-Step '제거 프로그램을 실행합니다: {0}' @($appDir)
+            try {
+                $process = Start-Process -FilePath $uninstaller -ArgumentList $SilentSwitches -Wait -PassThru
+            }
+            catch {
+                # e.g. Smart App Control refusing an unsigned program.
+                Stop-Install '제거 프로그램을 실행하지 못했습니다: {0}' @($_.Exception.Message)
+            }
+            if ($process.ExitCode -ne 0) {
+                Stop-Install '제거 프로그램이 실패했습니다 (종료 코드 {0}).' @($process.ExitCode)
+            }
+            # The uninstaller hands the work to a copy of itself, which deletes the uninstaller last.
+            $deadline = (Get-Date).AddSeconds($UninstallTimeoutSeconds)
+            while ((Get-Date) -lt $deadline -and ((Test-Path -LiteralPath $UninstallKey) -or (Test-Path -LiteralPath $uninstaller))) {
+                Start-Sleep -Milliseconds 200
+            }
+            if (Test-Path -LiteralPath $UninstallKey) {
+                Stop-Install '제거가 끝나지 않았습니다: {0}' @($appDir)
+            }
+            if ($appDir -and (Test-Path -LiteralPath $appDir)) {
+                # Settings and logs stay too: the running copy holds its lock file under them.
+                if ((Get-RunningApp (Join-Path $appDir $ExeName)).Count -gt 0) {
+                    Stop-Install 'TokenViewer 가 실행 중이라 설치 폴더를 다 지우지 못했습니다. TokenViewer 를 끝내고 다시 제거하세요: {0}' @($appDir)
+                }
+                Write-Step '제거했지만 설치 폴더에 다른 파일이 남아 있어 폴더는 두었습니다: {0}' @($appDir)
+            }
+            else {
+                Write-Step '지웠습니다: {0}' @($appDir)
+            }
+        }
+
+        # Removes a folder this script manages: a zip install from an older install.ps1, or an install whose
+        # uninstaller is gone.
+        function Uninstall-Folder([string]$Dir) {
+            if (-not (Test-InstallDirIsOurs $Dir)) {
+                Stop-Install '설치 폴더에 TokenViewer 가 아닌 파일이 있어 지우지 않습니다: {0}' @($Dir)
+            }
+            Stop-App (Join-Path $Dir $ExeName)
+            if (-not (Test-Path -LiteralPath $Dir)) {
+                return $false
+            }
+            Remove-Item -LiteralPath $Dir -Recurse -Force
+            Write-Step '지웠습니다: {0}' @($Dir)
+            return $true
         }
 
         function Uninstall-App {
-            if (-not (Test-InstallDirIsOurs)) {
-                Stop-Install '설치 폴더에 TokenViewer 가 아닌 파일이 있어 지우지 않습니다: {0}' @($InstallDir)
+            if (Test-Path -LiteralPath $UninstallKey) {
+                Uninstall-Setup
+                $found = $true
             }
-            Stop-App
-            $found = Test-Path -LiteralPath $InstallDir
+            else {
+                $found = Uninstall-Folder $InstallDir
+            }
             if (Get-ItemProperty -Path $RunKey -Name $RunValueName -ErrorAction SilentlyContinue) {
                 Remove-ItemProperty -Path $RunKey -Name $RunValueName
                 Write-Step '로그인 시 자동 실행을 껐습니다.'
-            }
-            if ($found) {
-                Remove-Item -LiteralPath $InstallDir -Recurse -Force
-                Write-Step '지웠습니다: {0}' @($InstallDir)
             }
             foreach ($path in @($ShortcutPath, $SettingsKey, $DataDir)) {
                 if (Test-Path -LiteralPath $path) {

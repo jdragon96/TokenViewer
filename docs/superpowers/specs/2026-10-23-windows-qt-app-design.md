@@ -216,17 +216,20 @@ Windows C 런타임은 `TZ=Asia/Seoul` 을 잘못 읽으므로 서울 시간대�
    Qt 5.15.2 MinGW 는 release DLL 만 있으므로 `--debug` 로도 같은 파일이 들어간다. 스크립트가 Qt 설치본과 해시로 같은지 확인한다.
 4. `THIRD_PARTY_NOTICES.md` 와 `licenses/` (LGPLv3, GPLv3, GCC Runtime Library Exception 전문) 를 함께 넣는다.
 5. 결과: `qt/dist/TokenViewer/`, `qt/dist/TokenViewer-windows.zip`, `TokenViewer-windows.zip.sha256`. 크기를 출력한다.
+6. 설치 프로그램 (5.6): `qt/dist/TokenViewer-windows-setup.exe` 와 `.sha256`. `-SkipInstaller` 로 건너뛴다. `ISCC.exe` 는 `-IsccPath`, `TV_ISCC`, PATH, 사용자별·Program Files 기본 위치 순으로 찾는다.
 
 ### 5.3. `qt/scripts/install.ps1`
 
+PowerShell 한 줄 설치도 5.6 의 설치 프로그램을 받아 조용히 실행한다. 두 경로가 같은 상태 (설정 → 앱 의 항목과 언인스톨러) 를 남기게 하기 위해서다 (2026-10-24).
+
 | 실행 | 동작 |
 | --- | --- |
-| `irm https://github.com/<owner>/TokenViewer/releases/latest/download/install.ps1 \| iex` | 최신 릴리스의 zip 과 `.sha256` 을 받아 확인 → 실행 중인 앱 종료 → 설치 → 시작 메뉴 바로가기 → 실행 |
-| `install.ps1 -FromSource` | `package-windows.ps1` 실행 → 같은 위치에 설치 → 실행 |
-| `install.ps1 -Uninstall` | 앱 종료 → `Run` 값, 설치 폴더, 시작 메뉴 바로가기, 설정(`HKCU\Software\TokenViewer`), `%LOCALAPPDATA%\TokenViewer` 삭제 |
+| `irm https://github.com/<owner>/TokenViewer/releases/latest/download/install.ps1 \| iex` | 최신 릴리스의 `TokenViewer-windows-setup.exe` 와 `.sha256` 을 받아 확인 → `/VERYSILENT /CURRENTUSER` 로 실행 → 앱 실행 |
+| `install.ps1 -FromSource` | `package-windows.ps1` 실행 → 만든 설치 프로그램을 같은 방식으로 실행 |
+| `install.ps1 -Uninstall` | 설치 프로그램의 제거 항목이 있으면 언인스톨러를 조용히 실행, 없으면 (zip 으로 설치한 예전 방식) 폴더·바로가기를 직접 지움 → `Run` 값, 설정(`HKCU\Software\TokenViewer`), `%LOCALAPPDATA%\TokenViewer` 삭제 |
 
-- 설치 위치: `%LOCALAPPDATA%\Programs\TokenViewer`. 관리자 권한을 쓰지 않는다. `TV_INSTALL_DIR` 로 바꿀 수 있다.
-- 앱 종료: 설치된 `TokenViewer.exe --quit` 를 먼저 쓰고, 5초 안에 끝나지 않으면 프로세스를 끝낸다.
+- 설치 위치: `%LOCALAPPDATA%\Programs\TokenViewer`. 관리자 권한을 쓰지 않는다. `TV_INSTALL_DIR` 로 바꿀 수 있다 (`/DIR=`). `-NoLaunch` 면 실행하지 않는다.
+- 앱 종료는 설치 프로그램이 한다 (5.6).
 - 저장소 주소: 릴리스 워크플로가 `install.ps1` 을 올릴 때 `$ReleaseRepo` 줄에 `${{ github.repository }}` 를 넣는다. 직접 실행하면 `git remote get-url origin`, `TV_REPO` 로 덮어쓸 수 있다.
 - PowerShell 로 받은 파일에는 인터넷 영역 표시가 붙지 않아 SmartScreen 경고 없이 실행된다. 브라우저로 zip 을 받으면 처음 한 번 "추가 정보 → 실행"이 필요하다 (README).
 - 끝에 Windows 11 은 아이콘이 `^` 안에 숨는다는 안내를 출력한다.
@@ -234,13 +237,29 @@ Windows C 런타임은 `TZ=Asia/Seoul` 을 잘못 읽으므로 서울 시간대�
 ### 5.4. CI (`.github/workflows/windows.yml`)
 
 - `qt/**`, `shared/**`, 워크플로 파일이 바뀐 push·PR: Qt 5.15.2 `win64_mingw81` + MinGW 8.1 설치 (`jurplel/install-qt-action`, MIT) → 구성·빌드·`ctest`.
-- `v*` 태그: `package-windows.ps1` → GitHub Release 에 zip, `.sha256`, `install.ps1` 을 올린다. macOS 워크플로와 같은 릴리스를 함께 만들므로, 릴리스가 이미 있으면(또는 만드는 사이에 생기면) 그 릴리스에 올린다.
+- `v*` 태그: `package-windows.ps1` → GitHub Release 에 zip, 설치 프로그램, 각 `.sha256`, `install.ps1` 을 올린다. macOS 워크플로와 같은 릴리스를 함께 만들므로, 릴리스가 이미 있으면(또는 만드는 사이에 생기면) 그 릴리스에 올린다.
+  러너 `windows-2022` 에는 Inno Setup 6.7.1 이 미리 설치되어 있다 (없으면 `choco install innosetup --version=6.7.1`).
 
 ### 5.5. 라이선스
 
 - Qt 5.15.2 (Core, Gui, Widgets, Network) 는 DLL 로 동봉한다 (LGPLv3, 정적 링크 금지 확인은 CMake 에 그대로 둔다).
 - MinGW-w64 런타임 DLL: `libstdc++-6.dll`, `libgcc_s_seh-1.dll` (GPLv3 + GCC Runtime Library Exception), `libwinpthread-1.dll` (MIT 계열). 고지와 전문을 넣는다. (2026-10-23 사용자 결정: 배포도 MinGW 로 한다.)
 - OpenSSL 은 넣지 않으므로 고지에서 뺀다. 앱 안 고지 화면(`오픈소스 라이선스 · Qt 정보`)은 그대로 둔다.
+- 설치 프로그램은 Inno Setup 6 으로 만든다. 라이선스(https://jrsoftware.org/files/is/license.txt)는 상업적 사용을 포함해 어떤 목적이든 허용하고, 바이너리에 Inno 의 저작권 고지를 남기라고 한다 (설치 프로그램이 스스로 남긴다).
+  6.5 부터 상업적 사용자에게 구매를 *요청*하지만 의무는 아니고, TokenViewer 는 비상업 MIT 프로젝트다.
+
+### 5.6. 설치 프로그램 (`qt/installer/TokenViewer.iss`, 2026-10-24 추가)
+
+- Inno Setup 6, 결과는 `TokenViewer-windows-setup.exe`. 버전·원본 폴더·아이콘은 `package-windows.ps1` 이 `/D` 로 넘긴다. 서명하지 않는다.
+- 사용자별 설치: `PrivilegesRequired=lowest` (UAC 없음), `{autopf}\TokenViewer` (= `%LOCALAPPDATA%\Programs\TokenViewer`, install.ps1 과 같다), 시작 메뉴 `TokenViewer.lnk`. 바탕 화면 아이콘 없음.
+- 설치 폴더를 고르는 페이지는 없다 (`DisableDirPage=yes`). 다른 파일이 있는 공용 폴더에 설치했다가 언인스톨러 없이 지울 때 남의 파일까지 지우는 일을 막기 위해서다. 폴더는 명령줄 `/DIR=` (install.ps1 의 `TV_INSTALL_DIR`) 로만 바꾼다.
+  install.ps1 은 언인스톨러가 없을 때 기본 폴더나 `TV_INSTALL_DIR` 만 폴더째 지우고, 그 밖의 폴더는 제거 항목만 지운 뒤 폴더 경로를 알려 준다.
+- `AppId` = `{CFD0D0E6-2DEE-4F55-95EB-05DE69CA8A73}` — **릴리스한 뒤에는 바꾸지 않는다** (업그레이드·제거가 이 값으로 이어진다). 게시자 `jy.seong`.
+- Windows 10 1903 이상, `x64compatible` (ARM64 Windows 11 은 x64 에뮬레이션으로 설치된다. zip 과 같다). 한국어·영어, UI 언어로 고른다 (Inno 공식 `Korean.isl`). `WizardStyle=modern`, lzma2 압축.
+- 설치·업그레이드·제거 전에 **설치 폴더에서 실행 중인** TokenViewer 만 찾아 (WMI 로 실행 파일 경로 비교) `--quit` 로 끄고, 5초 안에 안 끝나면 그 프로세스만 강제로 끝낸다. 다른 곳에서 실행 중인 TokenViewer 는 건드리지 않는다.
+- 마침 페이지의 "TokenViewer 실행" (기본 켬). 조용히 설치할 때는 실행하지 않는다 (install.ps1 이 실행한다).
+- 업그레이드할 때는 같은 폴더에 설치했던 경우에만 Qt 플러그인 등 하위 폴더를 비우고 다시 넣는다 (예전 파일이 남지 않게).
+- 제거: 파일, 바로가기, 이 사본을 가리키는 `Run` 값을 지운다. 설정·로그가 있으면 지울지 묻는다 (기본 아니요). 조용히 제거할 때는 `/PURGE` 를 줄 때만 지운다.
 
 ## 6. 작업 단위
 
@@ -254,6 +273,7 @@ Windows C 런타임은 `TZ=Asia/Seoul` 을 잘못 읽으므로 서울 시간대�
 | D. 앱 껍데기 | 드롭다운 위치, 고해상도 속성, Fusion·팔레트 적용, `SingleInstance`, `--quit` |
 | E. 배포 | 앱 아이콘, `package-windows.ps1`, `install.ps1`, CI, 고지·전문, README |
 | F. 화면 다듬기 (2026-10-24 추가) | 2.3 의 글꼴·색·불투명 창·컨트롤, 2.9 의 4칸 고정 목록 |
+| G. 설치 프로그램 (2026-10-24 추가) | 5.6 의 Inno Setup 설치 프로그램, install.ps1 이 그것을 쓰도록, CI 업로드 |
 
 ## 7. 위험
 
